@@ -3,9 +3,9 @@ code fence around it. The answer is looked for inside the answer rather than dem
 
 Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-answer-")
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-answer-")
 sys.path.insert(0, ".")
-from studio.ai import _parse
+from anhy.ai import _parse
 fails = []
 def check(n, got, want=True):
     ok = want(got) if callable(want) else got == want
@@ -25,7 +25,7 @@ except Exception:
 
 # ---- a hand-picked clip: an empty answer is asked once more, and a clip is never lost to it
 from unittest.mock import patch
-from studio import brain
+from anhy import brain
 item = {"start": 0, "end": 0, "score": 70, "category": "funny", "hook": "WILD NIGHT", "title": "T",
         "description": "D", "hashtags": ["Gaming"], "highlight_words": []}
 words = "Okay, I hope. You are all planning wild night out there. You can"

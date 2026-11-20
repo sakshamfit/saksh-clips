@@ -5,9 +5,9 @@ border that stays in the same place in every frame.
 
 Runs against the code directly, with its own empty data folder."""
 import os, shutil, subprocess, sys, tempfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-facecam-")
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-facecam-")
 sys.path.insert(0, ".")
-from studio import facecam, render
+from anhy import facecam, render
 fails = []
 def check(n, got, want=True):
     ok = want(got) if callable(want) else got == want
@@ -60,7 +60,7 @@ try:
           facecam.detect(os.path.join(work, "nope.mp4")), None)
 
     # ---- the job hands the webcam on to the render
-    from studio import jobs
+    from anhy import jobs
     job = {"source_path": cam}
     box = jobs._facecam(job)
     check("the job finds the webcam for its clips", bool(box), True)
@@ -92,7 +92,7 @@ try:
 
     # ---- what the model's one line is turned into
     from unittest.mock import patch
-    from studio import brain, ai as _ai
+    from anhy import brain, ai as _ai
     with patch.object(_ai, "see", return_value=("CAME x=71% y=20% w=29% h=38%", 0, 0)):
         got = brain.look_for_facecam(b"jpeg")
     check("the box in the model's answer is read", [round(v, 2) for v in (got["box"] or ())],

@@ -13,7 +13,14 @@ import sqlalchemy as sa
 
 from . import config, db
 
-COOKIE = "peakcut_session"
+COOKIE = "anhy_session"
+OLD_COOKIE = "peakcut_session"     # the name from before the name changed. Still read, so nobody is signed out
+
+
+def session_cookie(cookies) -> str:
+    """The sign-in token from the browser's cookies. Either name is read: the one in use now and the old one."""
+    return cookies.get(COOKIE) or cookies.get(OLD_COOKIE) or ""
+
 # No commas, semicolons, quotes, brackets or backslashes: in an email header those turn one address into several.
 EMAIL_RE = re.compile(r"^[^@\s,;:<>\"()\[\]\\]{1,64}@[^@\s,;:<>\"()\[\]\\]{1,180}\.[A-Za-z]{2,24}$")
 _SCRYPT = {"n": 2 ** 15, "r": 8, "p": 1}
@@ -136,8 +143,8 @@ def _use_link(token: str, purpose: str) -> str:
 def send_verify(u) -> bool:
     from . import mailer
     link = f"{config.PUBLIC_URL}/auth/verify?t={_make_link(u.id, 'verify', 3 * 86400)}"
-    return mailer.send(u.email, "Confirm your email for PeakCut", "Confirm your email",
-                       "Thanks for joining PeakCut. Confirm this is your email address to start clipping.",
+    return mailer.send(u.email, "Confirm your email for Anhy Clips", "Confirm your email",
+                       "Thanks for joining Anhy Clips. Confirm this is your email address to start clipping.",
                        "Confirm my email", link, "The link works for 3 days. If you didn't sign up, you can ignore this email.")
 
 
@@ -155,8 +162,8 @@ def forgot(email: str):
     if not u or u.disabled:
         return
     link = f"{config.PUBLIC_URL}/reset?t={_make_link(u.id, 'reset', 3600)}"
-    mailer.send(u.email, "Reset your PeakCut password", "Reset your password",
-                "Someone asked to reset the password for this PeakCut account. If that was you, choose a new one below.",
+    mailer.send(u.email, "Reset your Anhy Clips password", "Reset your password",
+                "Someone asked to reset the password for this Anhy Clips account. If that was you, choose a new one below.",
                 "Choose a new password", link, "The link works for one hour. If you didn't ask for this, ignore this email and your password stays the same.")
 
 
@@ -190,7 +197,7 @@ def _create(email: str, name: str, password_hash=None, google_sub=None):
         if c.execute(sa.select(db.users.c.id).where(db.users.c.email == email)).first():
             raise AuthError("There is already an account with that email. Sign in instead.")
         first = c.execute(sa.select(sa.func.count()).select_from(db.users)).scalar() == 0
-        # Every new account is a normal user. Admins are made by hand on the server: python -m studio.admin grant <email>
+        # Every new account is a normal user. Admins are made by hand on the server: python -m anhy.admin grant <email>
         c.execute(db.users.insert().values(id=uid, email=email, name=name.strip()[:120], password_hash=password_hash,
                                            google_sub=google_sub, is_admin=False, created_at=time.time()))
     config.user_dir(uid).mkdir(parents=True, exist_ok=True)

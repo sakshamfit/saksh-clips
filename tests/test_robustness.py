@@ -2,10 +2,10 @@
 monitor on a system it cannot fully measure, a recording whose ffmpeg cannot start, and the admin day totals.
 Runs against the code directly, with its own empty data folder: nothing outside it is touched."""
 import os, sys, tempfile, threading, time
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-robust-"); os.environ["DATABASE_URL"] = ""
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-robust-"); os.environ["DATABASE_URL"] = ""
 sys.path.insert(0, ".")
 import sqlalchemy as sa
-from studio import admin, auth, creators, ctx, db, live, load
+from anhy import admin, auth, creators, ctx, db, live, load
 db.init()
 fails = []
 def check(n, ok, x=""):

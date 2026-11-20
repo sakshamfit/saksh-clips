@@ -30,7 +30,7 @@ import time                                    # noqa: E402
 
 import sqlalchemy as sa                        # noqa: E402
 
-from studio import db                          # noqa: E402
+from anhy import db                          # noqa: E402
 
 db.init()
 with db.engine.begin() as cn:
@@ -59,7 +59,7 @@ r = a.post(f"/api/upload/{s['id']}/finish", json={})
 job = r.json()
 check("the pieces are joined into a video", r.status_code == 200 and bool(job.get("id")), r.text[:120])
 check("finishing twice does not make a second video", a.post(f"/api/upload/{s['id']}/finish", json={}).status_code == 404)
-data_dir = os.environ.get("PEAKCUT_DATA")
+data_dir = os.environ.get("ANHY_DATA")
 if data_dir and job.get("id"):
     src = list(Path(data_dir).glob(f"users/*/jobs/{job['id']}/source.mp4"))
     check("the file arrived byte for byte", bool(src) and hashlib.sha256(src[0].read_bytes()).hexdigest() == hashlib.sha256(data).hexdigest())

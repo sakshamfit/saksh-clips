@@ -5,13 +5,13 @@ import os
 import sys
 import tempfile
 
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-local-")
-os.environ.update(DATABASE_URL="", PEAKCUT_ACCOUNTS="0", PEAKCUT_AI_PROVIDER="gemini", PEAKCUT_AI_MODELS="", PEAKCUT_AI_KEY="",
-                  PEAKCUT_AI_KEY_FILE="", PEAKCUT_AI_BASE_URL="", PEAKCUT_PUBLIC_URL="http://127.0.0.1:8765")
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-local-")
+os.environ.update(DATABASE_URL="", ANHY_ACCOUNTS="0", ANHY_AI_PROVIDER="gemini", ANHY_AI_MODELS="", ANHY_AI_KEY="",
+                  ANHY_AI_KEY_FILE="", ANHY_AI_BASE_URL="", ANHY_PUBLIC_URL="http://127.0.0.1:8765")
 sys.path.insert(0, ".")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from studio import ai, config, db, server  # noqa: E402
+from anhy import ai, config, db, server  # noqa: E402
 
 db.init()
 fails = []
@@ -136,5 +136,5 @@ check("a failed test says why, without the key", (r.status_code, "wrong-key-0000
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
 import shutil  # noqa: E402
 db.engine.dispose()
-shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+shutil.rmtree(os.environ["ANHY_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)

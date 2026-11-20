@@ -1,19 +1,19 @@
 # Gaming mode
 
-PeakCut was built for talk: it reads a transcript and picks moments from it. A
+Anhy Clips was built for talk: it reads a transcript and picks moments from it. A
 gaming stream is mostly not talk — it is a game, a facecam, and a streamer
 reacting. Three changes make it work on those streams.
 
 ## 1. It knows which game it is
 
-`studio/games.py` reads the game from the stream's title, the video's title, the
+`anhy/games.py` reads the game from the stream's title, the video's title, the
 channel name, or the game the creator set. Twenty-three games are known by name,
 including GTA VI, GTA V, Fortnite, Minecraft, Valorant, Elden Ring, Palworld,
 Helldivers 2, Cyberpunk 2077, Marvel Rivals, The Finals, Rocket League and more.
 
 When the game is known, two things change.
 
-**The AI is told what it is looking at** (`GAME_RULES` in `studio/brain.py`):
+**The AI is told what it is looking at** (`GAME_RULES` in `anhy/brain.py`):
 
 ```
 This stream is Grand Theft Auto VI. Pick the moments that only mean something with that
@@ -26,7 +26,7 @@ game in mind:
 - The hashtags include GTA6, GTA6Game, ViceCity, RockstarGames, GTA6Launch.
 ```
 
-**Every post carries the game's tags** (`_tidy` in `studio/brain.py`), whatever
+**Every post carries the game's tags** (`_tidy` in `anhy/brain.py`), whatever
 the AI wrote for itself: `#GTA6`, `#GTA6Game`, `#ViceCity`, `#RockstarGames`,
 `#GTA6Launch` for GTA VI; `#GTA5`, `#GTAOnline`, `#GTA5RP` for GTA V. People
 search for the game, not for "gaming".
@@ -52,7 +52,7 @@ emote is not a crowd getting excited, but it looked exactly like one to a
 counter.
 
 The chat reader now keeps the names as well as the count
-(`studio/live.py`, `_chat`), and the two places that ask "did the chat react?"
+(`anhy/live.py`, `_chat`), and the two places that ask "did the chat react?"
 use people instead of messages:
 
 - the spike watcher (`_chat_spike`): a message jump now has to be backed by more
@@ -65,7 +65,7 @@ as messages.
 
 ## 3. The facecam is found, and the game fills the screen
 
-A gaming stream is a 16:9 game with a small webcam picture in one corner. PeakCut's
+A gaming stream is a 16:9 game with a small webcam picture in one corner. Anhy Clips'
 "blur" layout puts the whole 16:9 frame into a band with blurred fill above and
 below — fine for a talking head, poor for a game, where the play is a thin strip
 of the picture.
@@ -74,7 +74,7 @@ The new **gameplay** layout fills the 1080x1920 frame with the game (centre
 cropped, the same as "Fill screen") and puts the webcam in the top corner of it,
 so the viewer sees the play and the face at once.
 
-To do that, PeakCut has to know where the webcam is. `studio/facecam.py` finds it
+To do that, Anhy Clips has to know where the webcam is. `anhy/facecam.py` finds it
 by the one thing a webcam always has and a game almost never has: **a straight
 border that stays in the same place in every frame**. A wall in the game moves, a
 HUD bar changes, the edge of the webcam box does not move at all.
@@ -119,14 +119,14 @@ Only a sure answer is used. If the webcam is not found, the layout falls back to
 
 ## 4. Ad breaks and static screens
 
-Already covered: `studio/quality.py` finds the stretches of a video where
+Already covered: `anhy/quality.py` finds the stretches of a video where
 nothing moved and drops any clip that sits inside one. On a stream stitched with
 commercials, this is the difference between a clip of the game and a clip of a
 sponsor reading.
 
 ## What it does not do
 
-- **It does not watch the stream.** PeakCut reads words, loudness and chat. One frame
+- **It does not watch the stream.** Anhy Clips reads words, loudness and chat. One frame
   is looked at once, to find the webcam; it cannot tell that a headshot was good,
   only that the streamer said something.
 - **It does not know the game's story.** "He got the polaroid photo" means
@@ -148,7 +148,7 @@ A launch-night roster of game streamers uses:
 tighter bar means fewer clips.
 
 One setting is not in that list because it is an environment variable:
-**`PEAKCUT_LIVE_AI_TIMEOUT`** (45 seconds by default) is how long one AI answer
+**`ANHY_LIVE_AI_TIMEOUT`** (45 seconds by default) is how long one AI answer
 may take on a live stream. It is short on purpose. The AI is asked on its own
 thread, so while a model is thinking the speech is still being written and
 "clip that" still works — a slow answer costs one check, not the stream.

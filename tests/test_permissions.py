@@ -1,4 +1,4 @@
-"""Permission tests against a throwaway PeakCut server. Usage: test_permissions.py <base url> <project root> <python exe>"""
+"""Permission tests against a throwaway Anhy Clips server. Usage: test_permissions.py <base url> <project root> <python exe>"""
 import os
 import subprocess
 import sys
@@ -29,7 +29,7 @@ def signup(email, extra=None):
 
 
 def cli(*args):
-    return subprocess.run([PY, "-m", "studio.admin", *args], cwd=ROOT, env=os.environ, capture_output=True, text=True)
+    return subprocess.run([PY, "-m", "anhy.admin", *args], cwd=ROOT, env=os.environ, capture_output=True, text=True)
 
 
 anon = client()
