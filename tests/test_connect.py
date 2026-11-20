@@ -2,15 +2,15 @@
 stand-ins answering the way their documentation says, so nothing leaves this machine."""
 import json, os, sys, tempfile, time
 from urllib.parse import parse_qs, urlparse
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-connect-")
-os.environ.update(DATABASE_URL="", PEAKCUT_ACCOUNTS="1", PEAKCUT_PUBLIC_URL="https://clips.example.com", PEAKCUT_VERIFY_EMAIL="0",
-                  GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_CLIENT_FILE="", PEAKCUT_IG_APP_ID="", PEAKCUT_IG_APP_SECRET="",
-                  PEAKCUT_TIKTOK_CLIENT_KEY="", PEAKCUT_TIKTOK_CLIENT_SECRET="", PEAKCUT_BUFFER_CLIENT_ID="", PEAKCUT_BUFFER_CLIENT_SECRET="")
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-connect-")
+os.environ.update(DATABASE_URL="", ANHY_ACCOUNTS="1", ANHY_PUBLIC_URL="https://clips.example.com", ANHY_VERIFY_EMAIL="0",
+                  GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_CLIENT_FILE="", ANHY_IG_APP_ID="", ANHY_IG_APP_SECRET="",
+                  ANHY_TIKTOK_CLIENT_KEY="", ANHY_TIKTOK_CLIENT_SECRET="", ANHY_BUFFER_CLIENT_ID="", ANHY_BUFFER_CLIENT_SECRET="")
 sys.path.insert(0, ".")
 from pathlib import Path
 import sqlalchemy as sa
 from fastapi.testclient import TestClient
-from studio import accounts, auth, config, ctx, db, server
+from anhy import accounts, auth, config, ctx, db, server
 db.init()
 fails = []
 def check(n, got, want=True):
@@ -232,7 +232,7 @@ jd.mkdir(parents=True)
 (jd.parent / "job.json").write_text(json.dumps({"id": "job-12345678", "user": user.id, "dir": str(jd.parent), "clips": [], "status": "done",
                                                 "creator": None, "created": time.time(), "options": {}, "source": {"type": "file"}}), encoding="utf-8")
 (jd / "clip01.mp4").write_bytes(b"\x00" * 6_000)
-from studio import jobs
+from anhy import jobs
 jobs.load_user(user.id)
 with ctx.as_user(user.id):
     link = accounts.clip_link("job-12345678", "clip01.mp4")
@@ -313,5 +313,5 @@ with ctx.as_user(user.id):
     check("Buffer: the last channel takes the sign-in with it", accounts.buffer_connected(), False)
 
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
-import shutil; db.engine.dispose(); shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+import shutil; db.engine.dispose(); shutil.rmtree(os.environ["ANHY_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)

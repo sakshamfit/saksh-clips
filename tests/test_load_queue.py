@@ -5,9 +5,9 @@ import tempfile
 import threading
 import time
 
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp()
+os.environ["ANHY_DATA"] = tempfile.mkdtemp()
 sys.path.insert(0, sys.argv[1])
-from studio import config, jobs, load  # noqa: E402
+from anhy import config, jobs, load  # noqa: E402
 
 load.MIN_FREE_RAM_GB = 0.0  # this checks the processor; how much memory the test machine has free is not the point
 config.JOB_WORKERS = 8      # the ceiling on videos at once; the test is about load, not about how many cores this machine has

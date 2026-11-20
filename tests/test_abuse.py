@@ -1,4 +1,4 @@
-"""Abuse and limit tests against a throwaway PeakCut server. Usage: test_abuse.py <base url> <project root>"""
+"""Abuse and limit tests against a throwaway Anhy Clips server. Usage: test_abuse.py <base url> <project root>"""
 import sys
 
 import httpx
@@ -51,7 +51,7 @@ check("unverified upload refused before the file is read", c.post("/api/upload",
 # ---- confirm the email the way the server would after the link is clicked, then try bad options
 import os, subprocess  # noqa: E401,E402
 uid = c.get("/api/auth/me").json()["user"]["id"]
-subprocess.run([sys.executable, "-c", f"from studio import auth, db; db.init(); auth.mark_verified({uid!r})"],
+subprocess.run([sys.executable, "-c", f"from anhy import auth, db; db.init(); auth.mark_verified({uid!r})"],
                cwd=sys.argv[2], env=os.environ, check=True, capture_output=True)
 check("verified now", c.get("/api/auth/me").json()["user"]["verified"], True)
 for bad in ({"range_start": -5}, {"range_start": 50, "range_end": 10}, {"quality": "abc"}, {"range_end": "NaN"}):
@@ -81,8 +81,8 @@ check("not-modified never bypasses sign-in", httpx.Client(base_url=BASE).get("/a
 import subprocess  # noqa: E402
 probe = """
 import os
-os.environ["PEAKCUT_CLIENT_IP_HEADER"] = "CF-Connecting-IP"; os.environ["PEAKCUT_TRUST_PROXY"] = "1"
-from studio import server
+os.environ["ANHY_CLIENT_IP_HEADER"] = "CF-Connecting-IP"; os.environ["ANHY_TRUST_PROXY"] = "1"
+from anhy import server
 from starlette.datastructures import Headers
 class R:
     def __init__(s, peer, h): s.headers = Headers(h); s.client = type("C", (), {"host": peer})()

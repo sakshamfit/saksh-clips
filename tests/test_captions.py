@@ -33,8 +33,8 @@ def rejects_caption_value(call):
 
 
 def main(data):
-    os.environ.update(PEAKCUT_DATA=data, DATABASE_URL="", PEAKCUT_ACCOUNTS="0")
-    from studio import auth, brain, creators, ctx, db, jobs, render, roman, server
+    os.environ.update(ANHY_DATA=data, DATABASE_URL="", ANHY_ACCOUNTS="0")
+    from anhy import auth, brain, creators, ctx, db, jobs, render, roman, server
 
     db.init()
     try:

@@ -1,11 +1,11 @@
 """Deleting clips, videos, creators and accounts, bulk actions and the zip download. Runs against the code directly,
 with its own empty data folder: nothing outside it is touched."""
 import os, sys, tempfile, zipfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-del-"); os.environ["DATABASE_URL"] = ""
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-del-"); os.environ["DATABASE_URL"] = ""
 sys.path.insert(0, ".")
 from pathlib import Path
 import sqlalchemy as sa
-from studio import account, auth, config, creators, ctx, db, jobs
+from anhy import account, auth, config, creators, ctx, db, jobs
 db.init()
 fails = []
 def check(n, ok, x=""):
@@ -52,7 +52,7 @@ with ctx.as_user(a.id):
     check("an account with a video in progress is not deleted", ok)
     j = jobs.get(j3["id"]); j["status"] = "done"; jobs.save(j)
 udir = config.user_dir(a.id)
-from studio import posting
+from anhy import posting
 posting._posts.extend([{"id": "pa", "user": a.id, "status": "scheduled", "due_at": 0}, {"id": "pb", "user": b.id, "status": "scheduled", "due_at": 0}])
 check("the account is deleted", account.delete_account(a.id)["ok"] and auth.get_user(a.id) is None and not udir.exists())
 with db.engine.connect() as cn:
@@ -64,5 +64,5 @@ check("posts waiting for the deleted account are gone, the other account's stay"
 a2, _ = auth._create("A@example.com", "A again", password_hash="x")
 check("the same email can sign up again afterwards, as a new account", a2.id != a.id)
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
-import shutil; shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
+import shutil; shutil.rmtree(os.environ["ANHY_DATA"], ignore_errors=True)
 sys.exit(1 if fails else 0)

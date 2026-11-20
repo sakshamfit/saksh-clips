@@ -2,7 +2,7 @@
 
     python tests/run.py
 
-Starts PeakCut on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
+Starts Anhy Clips on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
 deletes the folder. Your real data and your running server are never touched. No AI key is needed: the tests cover accounts, permissions, limits and the queue, not clip quality."""
 import os
 import shutil
@@ -14,24 +14,24 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PORT = int(os.environ.get("PEAKCUT_TEST_PORT", "8799"))
+PORT = int(os.environ.get("ANHY_TEST_PORT", "8799"))
 BASE = f"http://127.0.0.1:{PORT}"
 
 
 def main() -> int:
-    data = Path(tempfile.mkdtemp(prefix="peakcut-test-"))
-    env = {**os.environ, "PEAKCUT_DATA": str(data), "PEAKCUT_PORT": str(PORT), "PEAKCUT_PUBLIC_URL": BASE,
-           "PEAKCUT_HOST": "127.0.0.1", "PEAKCUT_AUTO_RELOAD": "0", "DATABASE_URL": "",
-           "PEAKCUT_ACCOUNTS": "1", "PEAKCUT_FETCH_MODEL": "0", "PEAKCUT_UPDATE_CHECK": "0",                   # these tests are about people signing in; tests/test_local.py covers the default
+    data = Path(tempfile.mkdtemp(prefix="anhy-test-"))
+    env = {**os.environ, "ANHY_DATA": str(data), "ANHY_PORT": str(PORT), "ANHY_PUBLIC_URL": BASE,
+           "ANHY_HOST": "127.0.0.1", "ANHY_AUTO_RELOAD": "0", "DATABASE_URL": "",
+           "ANHY_ACCOUNTS": "1", "ANHY_FETCH_MODEL": "0", "ANHY_UPDATE_CHECK": "0",                   # these tests are about people signing in; tests/test_local.py covers the default
            # nothing outside this machine is contacted: no AI, no email, no Google sign-in
-           "PEAKCUT_SMTP_HOST": "", "PEAKCUT_VERIFY_EMAIL": "1",   # the tests cover the confirm-your-email rule
+           "ANHY_SMTP_HOST": "", "ANHY_VERIFY_EMAIL": "1",   # the tests cover the confirm-your-email rule
            "GOOGLE_CLIENT_ID": "", "GOOGLE_CLIENT_SECRET": "", "GOOGLE_CLIENT_FILE": "", "PYTHONUNBUFFERED": "1",
-           "PEAKCUT_AI_KEY": "", "PEAKCUT_AI_KEY_FILE": "", "PEAKCUT_AI_MODELS": "",
-           "PEAKCUT_UPLOAD_PART_MB": "5", "PEAKCUT_MAX_UPLOAD_MB": "64"}
+           "ANHY_AI_KEY": "", "ANHY_AI_KEY_FILE": "", "ANHY_AI_MODELS": "",
+           "ANHY_UPLOAD_PART_MB": "5", "ANHY_MAX_UPLOAD_MB": "64"}
     log = data / "server.log"
     failed = []
     with log.open("w", encoding="utf-8") as out:
-        server = subprocess.Popen([sys.executable, "-m", "studio.server"], cwd=ROOT, env=env, stdout=out, stderr=subprocess.STDOUT)
+        server = subprocess.Popen([sys.executable, "-m", "anhy.server"], cwd=ROOT, env=env, stdout=out, stderr=subprocess.STDOUT)
     try:
         for _ in range(90):
             try:

@@ -3,9 +3,9 @@ post carries.
 
 Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile
-os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
+os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
 sys.path.insert(0, ".")
-from studio import brain, games, live
+from anhy import brain, games, live
 fails = []
 def check(n, got, want=True):
     ok = want(got) if callable(want) else got == want

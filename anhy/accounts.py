@@ -76,9 +76,9 @@ def _write(name, data):
 # ------------------------------------------------------------------ the server's apps with each platform
 # name -> (what the platform calls the id, what it calls the secret, .env names for both)
 APPS = {"google": ("Client ID", "Client secret", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"),
-        "instagram": ("Instagram app ID", "Instagram app secret", "PEAKCUT_IG_APP_ID", "PEAKCUT_IG_APP_SECRET"),
-        "tiktok": ("Client key", "Client secret", "PEAKCUT_TIKTOK_CLIENT_KEY", "PEAKCUT_TIKTOK_CLIENT_SECRET"),
-        "buffer": ("Client ID", "Client secret", "PEAKCUT_BUFFER_CLIENT_ID", "PEAKCUT_BUFFER_CLIENT_SECRET")}
+        "instagram": ("Instagram app ID", "Instagram app secret", "ANHY_IG_APP_ID", "ANHY_IG_APP_SECRET"),
+        "tiktok": ("Client key", "Client secret", "ANHY_TIKTOK_CLIENT_KEY", "ANHY_TIKTOK_CLIENT_SECRET"),
+        "buffer": ("Client ID", "Client secret", "ANHY_BUFFER_CLIENT_ID", "ANHY_BUFFER_CLIENT_SECRET")}
 APP_FOR = {"youtube": "google", "instagram": "instagram", "tiktok": "tiktok", "buffer": "buffer"}
 _apps_seen = {"at": None, "data": {}}
 
@@ -338,7 +338,7 @@ def _youtube_finish(code: str) -> dict:
         "code": code, "client_id": cid, "client_secret": secret,
         "redirect_uri": redirect_for("youtube"), "grant_type": "authorization_code"}, timeout=30), "Google sign-in").json()
     if "refresh_token" not in tok:
-        raise ValueError("Google did not return a long-lived sign-in. Remove PeakCut's access in your Google account and connect again.")
+        raise ValueError("Google did not return a long-lived sign-in. Remove Anhy Clips' access in your Google account and connect again.")
     ch = _check(httpx.get("https://www.googleapis.com/youtube/v3/channels", params={"part": "snippet", "mine": "true"},
                           headers={"Authorization": f"Bearer {tok['access_token']}"}, timeout=30), "Reading the channel").json()
     if not ch.get("items"):
@@ -401,7 +401,7 @@ def _instagram_finish(code: str) -> dict:
     if isinstance(short.get("data"), list) and short["data"]:
         short = short["data"][0]
     if "instagram_business_content_publish" not in str(short.get("permissions", "instagram_business_content_publish")):
-        raise ValueError("PeakCut needs permission to publish. Connect again and leave every box ticked.")
+        raise ValueError("Anhy Clips needs permission to publish. Connect again and leave every box ticked.")
     long = _check(httpx.get(f"{IG}/access_token", params={"grant_type": "ig_exchange_token", "client_secret": secret,
                                                          "access_token": short["access_token"]}, timeout=30),
                   "Keeping the Instagram sign-in").json()
@@ -510,7 +510,7 @@ def _tt_tokens(form: dict) -> dict:
 def _tiktok_finish(code: str) -> dict:
     tok = _tt_tokens({"code": code, "grant_type": "authorization_code", "redirect_uri": redirect_for("tiktok")})
     if "video.publish" not in str(tok.get("scope", "")):
-        raise ValueError("PeakCut needs permission to post videos. Connect again and allow posting.")
+        raise ValueError("Anhy Clips needs permission to post videos. Connect again and allow posting.")
     acc = {"id": f"tt_{tok['open_id']}", "platform": "tiktok", "name": "TikTok account", "added": time.time(),
            "open_id": tok["open_id"], "access_token": tok["access_token"], "refresh_token": tok["refresh_token"],
            "expires": time.time() + int(tok.get("expires_in", 7200)) - 120}
@@ -544,7 +544,7 @@ def _tiktok_creator(acc) -> dict:
     return _tt_post(acc, "/post/publish/creator_info/query/", {}, "Reading the TikTok account")
 
 
-# PeakCut's visibility setting -> what TikTok calls it, best first
+# Anhy Clips' visibility setting -> what TikTok calls it, best first
 TT_PRIVACY = {"public": ["PUBLIC_TO_EVERYONE", "FOLLOWER_OF_CREATOR", "MUTUAL_FOLLOW_FRIENDS"],
               "unlisted": ["MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR"], "private": ["SELF_ONLY"]}
 
@@ -657,7 +657,7 @@ def _buf_why(errors) -> str:
     for e in errors if isinstance(errors, list) else []:
         if isinstance(e, dict) and e.get("message"):
             return str(e["message"])[:300]
-    return "Buffer sent an answer Saksh Clip could not read."
+    return "Buffer sent an answer Anhy Clips could not read."
 
 
 def _buf_post(url: str, what: str, **kw):
@@ -792,7 +792,7 @@ def _buffer_finish(code: str, verifier: str) -> dict:
     tok = _buf_tokens({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_for("buffer")},
                       verifier)
     if "posts:write" not in str(tok.get("scope", "posts:write")):
-        raise ValueError("Saksh Clip needs permission to post. Connect again and allow posting.")
+        raise ValueError("Anhy Clips needs permission to post. Connect again and allow posting.")
     was = _buffer_cred()
     _buffer_put({"kind": "oauth", "token": tok["access_token"], "refresh": tok.get("refresh_token", ""),
                  "expires": time.time() + int(tok.get("expires_in", 3600)) - 120, "at": time.time()})
@@ -834,8 +834,8 @@ def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "",
     if not job_id:
         raise RuntimeError("Buffer needs to know which clip to fetch.")
     if not config.PUBLIC_URL.startswith("https://"):
-        raise RuntimeError("Buffer fetches each clip from this server, so Saksh Clip needs a public https address: "
-                           "set PEAKCUT_PUBLIC_URL to your domain (see DEPLOY.md).")
+        raise RuntimeError("Buffer fetches each clip from this server, so Anhy Clips needs a public https address: "
+                           "set ANHY_PUBLIC_URL to your domain (see DEPLOY.md).")
     if not path.is_file():
         raise RuntimeError("The clip's file is not on this server any more.")
     body = {"text": _buffer_text(text, acc.get("service", "")), "channelId": acc["channel"],
