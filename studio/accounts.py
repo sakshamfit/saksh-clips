@@ -3,7 +3,10 @@
 Stored under users/<user>/accounts. People connect YouTube, Instagram and TikTok with one click: they sign in on the
 platform's own page and come back. For that, whoever runs the server registers one app with each platform once
 (its id and secret), in .env or in the dashboard (Settings, Connected apps, Set up). Those belong to the server,
-never to users."""
+never to users.
+
+Buffer is here too, and reaches every channel in a person's Buffer account at once. It works with an API key from
+Buffer's own settings page, which needs nothing registered here, or with a Buffer app for the one-click sign-in."""
 import base64
 import hashlib
 import hmac
@@ -20,7 +23,7 @@ import httpx
 from . import config, ctx
 
 _lock = threading.RLock()
-_states: dict = {}   # one-time values for the connect redirects: state -> (user id, when, platform)
+_states: dict = {}   # one-time values for the connect redirects: state -> (user id, when, platform, what went with it)
 
 SECRET_KEYS = ("discord_webhook", "telegram_token")
 SETTING_DEFAULTS = {"discord_webhook": "", "telegram_token": "", "telegram_chat": "", "paused": False,
@@ -32,7 +35,11 @@ IG_UPLOAD = "https://rupload.facebook.com/ig-api-upload/v21.0"
 IG_SCOPES = "instagram_business_basic,instagram_business_content_publish"
 TT = "https://open.tiktokapis.com/v2"
 TT_SCOPES = "user.info.basic,video.publish"
-PLATFORM_NAMES = {"youtube": "YouTube", "instagram": "Instagram", "tiktok": "TikTok"}
+BUF = "https://api.buffer.com"          # every question to Buffer goes to this one address
+BUF_AUTH = "https://auth.buffer.com"    # where people sign in to let this server post for them
+BUF_SCOPES = "posts:write account:read offline_access"
+BUF_KEY_PAGE = "https://publish.buffer.com/settings/api"
+PLATFORM_NAMES = {"youtube": "YouTube", "instagram": "Instagram", "tiktok": "TikTok", "buffer": "Buffer"}
 
 
 def _dir() -> Path:
@@ -70,8 +77,9 @@ def _write(name, data):
 # name -> (what the platform calls the id, what it calls the secret, .env names for both)
 APPS = {"google": ("Client ID", "Client secret", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"),
         "instagram": ("Instagram app ID", "Instagram app secret", "PEAKCUT_IG_APP_ID", "PEAKCUT_IG_APP_SECRET"),
-        "tiktok": ("Client key", "Client secret", "PEAKCUT_TIKTOK_CLIENT_KEY", "PEAKCUT_TIKTOK_CLIENT_SECRET")}
-APP_FOR = {"youtube": "google", "instagram": "instagram", "tiktok": "tiktok"}
+        "tiktok": ("Client key", "Client secret", "PEAKCUT_TIKTOK_CLIENT_KEY", "PEAKCUT_TIKTOK_CLIENT_SECRET"),
+        "buffer": ("Client ID", "Client secret", "PEAKCUT_BUFFER_CLIENT_ID", "PEAKCUT_BUFFER_CLIENT_SECRET")}
+APP_FOR = {"youtube": "google", "instagram": "instagram", "tiktok": "tiktok", "buffer": "buffer"}
 _apps_seen = {"at": None, "data": {}}
 
 
@@ -154,18 +162,21 @@ def save_app(platform: str, cid: str, secret: str) -> dict:
     return apps_public()
 
 
-def _new_state(platform: str) -> str:
+def _new_state(platform: str, extra: str = "") -> str:
+    """A one-time value that goes with a Connect button. `extra` is what only the way back needs (Buffer's PKCE)."""
     state = secrets.token_urlsafe(16)
     for k in [k for k, v in list(_states.items()) if time.time() - v[1] > 900]:
         _states.pop(k, None)
-    _states[state] = (ctx.uid(), time.time(), platform)
+    _states[state] = (ctx.uid(), time.time(), platform, extra)
     return state
 
 
-def _take_state(state: str, platform: str):
+def _take_state(state: str, platform: str) -> str:
+    """Check a return from a platform's sign-in page, and hand back the `extra` that went out with it."""
     got = _states.pop(state or "", None)
     if not got or got[0] != ctx.uid() or got[2] != platform or time.time() - got[1] > 900:
         raise ValueError("This sign-in has expired. Press Connect again.")
+    return got[3] if len(got) > 3 else ""
 
 
 def connect_url(platform: str) -> str:
@@ -175,7 +186,16 @@ def connect_url(platform: str) -> str:
     if not can_connect(platform):
         raise ValueError(f"Connecting {PLATFORM_NAMES[platform]} isn't set up on this server yet.")
     cid, _ = app_keys(APP_FOR[platform])
-    state, redirect = _new_state(platform), redirect_for(platform)
+    redirect = redirect_for(platform)
+    if platform == "buffer":
+        # Buffer signs apps in with PKCE: a random value stays here, and only its hash goes with the request.
+        verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
+        return f"{BUF_AUTH}/auth?" + urlencode({
+            "client_id": cid, "redirect_uri": redirect, "response_type": "code", "scope": BUF_SCOPES,
+            "state": _new_state(platform, verifier), "prompt": "consent",
+            "code_challenge": base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("="),
+            "code_challenge_method": "S256"})
+    state = _new_state(platform)
     if platform == "youtube":
         return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
             "client_id": cid, "redirect_uri": redirect, "response_type": "code", "scope": YT_SCOPES,
@@ -188,10 +208,12 @@ def connect_url(platform: str) -> str:
 
 
 def connect_finish(platform: str, code: str, state: str) -> dict:
-    _take_state(state, platform)
+    extra = _take_state(state, platform)
     code = (code or "").split("#")[0]           # Instagram adds "#_" to the code
     if not code:
         raise ValueError("The platform did not send a sign-in code. Try again.")
+    if platform == "buffer":
+        return _buffer_finish(code, extra)
     return {"youtube": _youtube_finish, "instagram": _instagram_finish, "tiktok": _tiktok_finish}[platform](code)
 
 
@@ -292,7 +314,11 @@ def _put(acc):
 
 def remove(aid):
     with _lock:
-        _write("accounts.json", [a for a in _all() if a["id"] != aid])
+        was = next((a for a in _all() if a["id"] == aid), None)
+        rest = [a for a in _all() if a["id"] != aid]
+        _write("accounts.json", rest)
+        if was and was["platform"] == "buffer" and not any(a["platform"] == "buffer" for a in rest):
+            _buffer_forget()          # the last Buffer channel went: the sign-in has nothing left to post to
 
 
 def _check(r, what):
@@ -577,3 +603,254 @@ def tiktok_upload(acc, path: Path, caption: str, privacy: str = "public"):
         acc["detail"] = "Posts are private until this server's TikTok app is reviewed"
         _put(acc)
     return str(ids[0]) if ids else box["publish_id"], url
+
+
+# ------------------------------------------------------------------ Buffer (one sign-in, every channel in it)
+# Buffer is a scheduling service: people connect their social accounts to Buffer, and clips go out through it.
+# One Buffer sign-in brings every channel in that account, so each channel becomes an account of its own here, and
+# each creator can pick the ones its clips go to.
+#
+# Two ways in, both on Buffer's own API settings page:
+#   - an API key. Every Buffer plan has one, and nothing has to be registered here first: this is the normal way.
+#   - a Buffer app, for the one-click Connect. Whoever runs the server registers it once (Settings, Set up).
+#
+# Buffer takes a video by address, never as an upload, and goes and fetches it when the post goes out. So clips are
+# sent as "share now": this app's own queue has already decided when, and the signed link is fresh at that moment.
+BUF_ORGS = "query { account { organizations { id name } } }"
+BUF_CHANNELS = """query Channels($org: OrganizationId!) { channels(input: {organizationId: $org}) {
+ id name service organizationId type isDisconnected isLocked isQueuePaused externalLink } }"""
+BUF_POST = """mutation PostClip($input: CreatePostInput!) { createPost(input: $input) {
+ ... on PostActionSuccess { post { id status dueAt externalLink } }
+ ... on MutationError { message } } }"""
+
+BUF_SERVICES = {"instagram": "Instagram", "tiktok": "TikTok", "youtube": "YouTube", "twitter": "X",
+                "facebook": "Facebook", "linkedin": "LinkedIn", "pinterest": "Pinterest", "threads": "Threads",
+                "bluesky": "Bluesky", "mastodon": "Mastodon", "google": "Google Business", "substack": "Substack"}
+# The longest post each network takes. Buffer refuses one that is longer, so the caption is cut to fit instead.
+BUF_TEXT_MAX = {"twitter": 280, "bluesky": 300, "threads": 500, "mastodon": 500}
+BUF_TEXT_DEFAULT = 1500
+BUF_LINK_HOURS = 6      # how long a clip's address stays good: the post goes out at once, but a long video takes a while
+
+
+def _buffer_cred() -> dict:
+    """This person's Buffer sign-in: an API key, or the tokens from a Connect."""
+    c = _read("buffer.json", {})
+    return c if isinstance(c, dict) and c.get("token") else {}
+
+
+def _buffer_put(cred: dict):
+    with _lock:
+        _write("buffer.json", cred)
+
+
+def _buffer_forget():
+    with _lock:
+        _write("buffer.json", {})
+
+
+def buffer_connected() -> bool:
+    return bool(_buffer_cred())
+
+
+def _buf_why(errors) -> str:
+    """Buffer's own words for what went wrong, out of the list it answers with."""
+    for e in errors if isinstance(errors, list) else []:
+        if isinstance(e, dict) and e.get("message"):
+            return str(e["message"])[:300]
+    return "Buffer sent an answer Saksh Clip could not read."
+
+
+def _buf_post(url: str, what: str, **kw):
+    """A request to Buffer, with a plain answer when Buffer cannot be reached at all."""
+    try:
+        return httpx.post(url, **kw)
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"{what}: couldn't reach Buffer. {str(e)[:120]}")
+
+
+def _buf_tokens(form: dict, verifier: str = "") -> dict:
+    """Tokens from Buffer's sign-in: after a Connect, or to renew one that has run out."""
+    cid, secret = app_keys("buffer")
+    body = {"client_id": cid, **form}
+    if secret:
+        body["client_secret"] = secret      # Buffer also allows an app with no secret; then the PKCE value is the proof
+    if verifier:
+        body["code_verifier"] = verifier
+    r = _buf_post(f"{BUF_AUTH}/token", "Signing in to Buffer", data=body, timeout=30,
+                  headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        tok = r.json()
+    except ValueError:
+        tok = {}
+    if r.status_code >= 400 or not isinstance(tok, dict) or not tok.get("access_token"):
+        why = (tok.get("error_description") or tok.get("error")) if isinstance(tok, dict) else ""
+        raise ValueError(f"Buffer sign-in failed: {str(why or r.text[:200])[:200]}")
+    return tok
+
+
+def _buf_token(cred: dict) -> str:
+    """The token to send now. An API key is used as it is; a Connect token is renewed when it runs out."""
+    if cred.get("kind") != "oauth" or cred.get("expires", 0) > time.time():
+        return cred["token"]
+    tok = _buf_tokens({"grant_type": "refresh_token", "refresh_token": cred.get("refresh", "")})
+    # Buffer hands out a new refresh token each time and retires the old one: keep the new one straight away
+    cred.update(token=tok["access_token"], refresh=tok.get("refresh_token", cred.get("refresh", "")),
+                expires=time.time() + int(tok.get("expires_in", 3600)) - 120)
+    _buffer_put(cred)
+    return cred["token"]
+
+
+def _buf(query: str, variables: dict = None, what: str = "Buffer"):
+    """One question to Buffer. Buffer answers 200 even when the question failed, so the answer is always read."""
+    cred = _buffer_cred()
+    if not cred:
+        raise ValueError("Buffer isn't connected. Connect it in Settings, Connected apps.")
+    r = _buf_post(BUF, what, json={"query": query, "variables": variables or {}}, timeout=60,
+                  headers={"Authorization": f"Bearer {_buf_token(cred)}", "Content-Type": "application/json"})
+    if r.status_code in (401, 403):
+        raise ValueError("Buffer refused this sign-in. Connect Buffer again, or make a new API key in Buffer.")
+    if r.status_code >= 400:
+        raise RuntimeError(f"{what} failed ({r.status_code}): {r.text[:200]}")
+    try:
+        data = r.json()
+    except ValueError:
+        raise RuntimeError(f"{what} failed: Buffer's answer was not readable.")
+    if not isinstance(data, dict):
+        raise RuntimeError(f"{what} failed: Buffer's answer was not readable.")
+    if data.get("errors"):
+        raise RuntimeError(f"{what} failed: {_buf_why(data['errors'])}")
+    return data.get("data") or {}
+
+
+def _buffer_detail(c: dict) -> str:
+    """What the account row says under a channel's name: its Buffer organization, and anything wrong with it."""
+    why = ("Disconnected in Buffer" if c.get("isDisconnected") else
+           "Locked: this Buffer plan doesn't include the channel" if c.get("isLocked") else
+           "Queue paused in Buffer" if c.get("isQueuePaused") else "")
+    return " · ".join(x for x in (str(c.get("org_name") or ""), why) if x)
+
+
+def _buffer_channels() -> list:
+    """Every channel in this Buffer account, across all of its organizations."""
+    orgs = (_buf(BUF_ORGS, what="Reading the Buffer account").get("account") or {}).get("organizations") or []
+    out = []
+    for o in orgs if isinstance(orgs, list) else []:
+        if not isinstance(o, dict) or not o.get("id"):
+            continue
+        got = _buf(BUF_CHANNELS, {"org": o["id"]}, "Reading the Buffer channels").get("channels") or []
+        out += [{**c, "org_name": o.get("name") or ""} for c in got if isinstance(c, dict) and c.get("id")]
+    return out
+
+
+def buffer_sync() -> list:
+    """Read the channels from Buffer and keep one account here for each. Channels dropped in Buffer go from here too."""
+    chans = _buffer_channels()
+    if not chans:
+        raise ValueError("That Buffer account has no channels yet. Connect a channel in Buffer, then try again.")
+    have = {a["id"]: a for a in _all() if a["platform"] == "buffer"}
+    keep = []
+    for c in chans:
+        aid = f"bf_{c['id']}"
+        old = have.get(aid) or {}
+        svc = str(c.get("service") or "")
+        net = BUF_SERVICES.get(svc, svc.title())
+        raw = str(c.get("name") or "").strip()[:60]
+        keep.append({"id": aid, "platform": "buffer", "added": old.get("added") or time.time(),
+                     "channel": str(c["id"]), "service": svc, "org": str(c.get("organizationId") or ""),
+                     # the network goes in the name too: the post queue shows the name on its own
+                     "name": (f"{raw} ({net})" if raw and net else raw or net or "Buffer channel")[:80],
+                     "detail": _buffer_detail(c)[:160], "link": str(c.get("externalLink") or "")[:300]})
+    with _lock:
+        _write("accounts.json", [a for a in _all() if a["platform"] != "buffer"] + keep)
+    return keep
+
+
+def buffer_add(key: str) -> list:
+    """Buffer connected with an API key pasted from Buffer's own settings page. Nothing to register here first."""
+    key = str(key or "").strip()
+    if not re.fullmatch(r"[\w.\-]{16,300}", key):
+        raise ValueError(f"Paste your Buffer API key exactly as Buffer shows it, from {BUF_KEY_PAGE}.")
+    was = _buffer_cred()
+    _buffer_put({"kind": "key", "token": key, "at": time.time()})
+    try:
+        return buffer_sync()
+    except Exception:
+        _buffer_back(was)         # a key that doesn't work is not left behind, and a working one is put back
+        raise
+
+
+def _buffer_back(was: dict):
+    """Undo a sign-in that turned out not to work, keeping whatever was connected before it."""
+    if was:
+        _buffer_put(was)
+    else:
+        _buffer_forget()
+
+
+def _buffer_finish(code: str, verifier: str) -> dict:
+    """The way back from Buffer's own sign-in page: swap the code for tokens, then read the channels."""
+    tok = _buf_tokens({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_for("buffer")},
+                      verifier)
+    if "posts:write" not in str(tok.get("scope", "posts:write")):
+        raise ValueError("Saksh Clip needs permission to post. Connect again and allow posting.")
+    was = _buffer_cred()
+    _buffer_put({"kind": "oauth", "token": tok["access_token"], "refresh": tok.get("refresh_token", ""),
+                 "expires": time.time() + int(tok.get("expires_in", 3600)) - 120, "at": time.time()})
+    try:
+        chans = buffer_sync()
+    except Exception:
+        _buffer_back(was)
+        raise
+    return {"id": "buffer", "platform": "buffer", "name": "Buffer", "channels": len(chans)}
+
+
+def _buffer_text(text: str, service: str) -> str:
+    """A caption short enough for this network, cut at a word where it can be."""
+    limit = BUF_TEXT_MAX.get(service, BUF_TEXT_DEFAULT)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    sp = cut.rfind(" ")
+    return (cut[:sp] if sp >= limit - 80 else cut).rstrip()
+
+
+def _buffer_meta(acc, title: str, privacy: str) -> dict:
+    """What a network needs on top of the video: YouTube a title and a category, Instagram that it is a Reel."""
+    if acc.get("service") == "youtube":
+        return {"youtube": {"title": re.sub(r"[<>]", "", title)[:100] or "Clip", "categoryId": "20",   # Gaming, as elsewhere
+                            "privacy": privacy if privacy in ("public", "unlisted", "private") else "public",
+                            "madeForKids": False}}
+    if acc.get("service") == "instagram":
+        return {"instagram": {"type": "reel", "shouldShareToFeed": True}}
+    return {}
+
+
+def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "", privacy: str = "public"):
+    """Send one clip to one Buffer channel, to go out at once. (Buffer's post id, its link on the network if it has
+    one yet.) Buffer fetches the clip from a signed link here, which is why the post is sent now rather than left
+    in Buffer's queue: a queued post can go out days later, long after the link has expired."""
+    if not acc.get("channel"):
+        raise RuntimeError("That Buffer channel is not connected any more. Press Refresh channels.")
+    if not job_id:
+        raise RuntimeError("Buffer needs to know which clip to fetch.")
+    if not config.PUBLIC_URL.startswith("https://"):
+        raise RuntimeError("Buffer fetches each clip from this server, so Saksh Clip needs a public https address: "
+                           "set PEAKCUT_PUBLIC_URL to your domain (see DEPLOY.md).")
+    if not path.is_file():
+        raise RuntimeError("The clip's file is not on this server any more.")
+    body = {"text": _buffer_text(text, acc.get("service", "")), "channelId": acc["channel"],
+            "schedulingType": "automatic", "mode": "shareNow",
+            "assets": [{"video": {"url": clip_link(job_id, path.name, seconds=BUF_LINK_HOURS * 3600),
+                                  "metadata": {"thumbnailOffset": 1000}}}]}
+    meta = _buffer_meta(acc, title, privacy)
+    if meta:
+        body["metadata"] = meta
+    out = _buf(BUF_POST, {"input": body}, f"Posting to {acc.get('name') or 'the channel'} on Buffer").get("createPost") or {}
+    if out.get("message"):
+        raise RuntimeError(f"Buffer did not take the post: {str(out['message'])[:200]}")
+    post = out.get("post") if isinstance(out.get("post"), dict) else {}
+    if not post.get("id"):
+        raise RuntimeError("Buffer did not say which post it made. Look in the channel's queue in Buffer.")
+    if post.get("status") == "error":
+        raise RuntimeError("Buffer could not publish this. Open the channel in Buffer to see why.")
+    return str(post["id"]), str(post.get("externalLink") or "")

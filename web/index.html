@@ -856,6 +856,7 @@ const I = {
  "film": "<path d=\"M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,88h80v80H40Zm96-16V56h32V72Zm-16,0H88V56h32Zm0,112v16H88V184Zm16,0h32v16H136Zm0-16V88h80v80Zm80-96H184V56h32ZM72,56V72H40V56ZM40,184H72v16H40Zm176,16H184V184h32v16Z\"/>",
  "cog": "<path d=\"M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z\"/>",
  "plus": "<path d=\"M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z\"/>",
+ "refresh": "<path d=\"M187.4,68.6A84,84,0,1,1,128,44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"16\" stroke-linecap=\"round\"/><path d=\"M128,24l40,20-40,20Z\"/>",
  "rec": "<path d=\"M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm0-160a72,72,0,1,0,72,72A72.08,72.08,0,0,0,128,56Zm0,128a56,56,0,1,1,56-56A56.06,56.06,0,0,1,128,184Z\"/>",
  "stop": "<path d=\"M200,40H56A16,16,0,0,0,40,56V200a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,160H56V56H200V200Z\"/>",
  "folder": "<path d=\"M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64ZM93.34,64,123.2,86.4A8,8,0,0,0,128,88h72v16H69.77a16,16,0,0,0-15.18,10.94L40,158.7V64Zm112,136H43.1l26.67-80H232Z\"/>",
@@ -2084,6 +2085,7 @@ async function drawSettings() {
       const yt = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.5A3.02 3.02 0 0 0 .5 6.19C0 8.07 0 12 0 12s0 3.93.5 5.81a3.02 3.02 0 0 0 2.12 2.14c1.88.5 9.38.5 9.38.5s7.5 0 9.38-.5a3.02 3.02 0 0 0 2.12-2.14C24 15.93 24 12 24 12s0-3.93-.5-5.81zM9.55 15.57V8.43L15.82 12l-6.27 3.57z"/></svg>';
       const ig = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23a3.7 3.7 0 0 1-.9 1.38c-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16zM12 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32zm0 10.16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.4-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88z"/></svg>';
       const tt = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.3 0 .59.04.86.13v-3.5a6.37 6.37 0 0 0-.86-.05A6.34 6.34 0 0 0 3.15 15.7a6.34 6.34 0 0 0 10.86 4.43 6.3 6.3 0 0 0 1.81-4.43V8.73a8.2 8.2 0 0 0 4.77 1.52V6.8a4.85 4.85 0 0 1-1-.11z"/></svg>';
+      const bf = '<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 1.6 23.2 7.2 12 12.8.8 7.2 12 1.6zM2.6 11.4l1.9-.95L12 14.2l7.5-3.75 1.9.95L12 16.1l-9.4-4.7zm0 4.3 1.9-.95L12 18.5l7.5-3.75 1.9.95L12 20.4l-9.4-4.7z"/></svg>';
       const ok = S.status.connect || {}, admin = me.is_admin;
       const setup = admin ? await api("/api/apps").catch(() => null) : null;
       const GUIDE = {
@@ -2098,13 +2100,12 @@ async function drawSettings() {
         tiktok: ["https://developers.tiktok.com/apps", "TikTok for Developers",
           ["Create an app and add <b>Login Kit</b> and <b>Content Posting API</b> with Direct Post turned on.",
            "Add the address below as a redirect URI, with the scopes <b>user.info.basic</b> and <b>video.publish</b>.", "Paste the Client key and Client secret here."],
-          "Until TikTok reviews your app, clips are posted as private: only the account owner sees them."]};
-      const card = (pf, name, logo, bg, desc) => {
-        const accs = mine(pf), st = setup?.[pf], open = S.setupOpen === pf, g = GUIDE[pf];
-        const act = (ok[pf] ? `<a class="btn sm primary" href="/oauth/${pf}/start">${ic("plus")}${accs.length ? "Add another" : "Connect"}</a>`
-            : admin ? `<button class="btn sm primary" data-act="appsetup" data-p="${pf}">${ic("cog")}Set up</button>` : `<span class="pill">Not set up on this server</span>`)
-          + (ok[pf] && admin ? `<button class="btn sm ghost" data-act="appsetup" data-p="${pf}" title="Change this server's ${name} app">${ic("cog")}</button>` : "");
-        const panel = open && st ? `<div class="appsetup">
+          "Until TikTok reviews your app, clips are posted as private: only the account owner sees them."],
+        buffer: ["https://publish.buffer.com/settings/api", "Buffer's API settings",
+          ["Open <b>Settings, API</b> in Buffer and register an app there (Buffer calls it an OAuth client).",
+           "Add the address below as its redirect URI.", "Paste the app's Client ID and Client secret here."],
+          "Only for the one-click sign-in. Most people don't need any of it: press <b>Use an API key</b> and paste the key from that same Buffer page, and nothing has to be registered here."]};
+      const setupPanel = (pf, name, st, g) => `<div class="appsetup">
             <p class="sub">To let people connect ${name}, register this server once with <a href="${g[0]}" target="_blank" rel="noopener">${g[1]}</a>. It takes about five minutes.</p>
             <ol>${g[2].map(x => `<li>${x}</li>`).join("")}</ol>
             <div class="copyrow"><code>${esc(st.redirect)}</code><button class="btn sm" data-act="copytext" data-t="${esc(st.redirect)}">${ic("copy")}Copy</button></div>
@@ -2112,16 +2113,43 @@ async function drawSettings() {
             <div class="fields"><label class="f">${esc(st.id_label)}<input id="app_id" placeholder="${st.ready ? "Saved: " + esc(st.id_hint) + ". Paste a new one to replace it" : ""}" autocomplete="off" spellcheck="false"></label>
               <label class="f">${esc(st.secret_label)}<input id="app_secret" type="password" placeholder="${st.ready ? "Saved. Paste a new one to replace it" : ""}" autocomplete="off"></label></div>
             <p class="sub">${g[3]}</p>
-            <div class="row"><button class="btn primary" data-act="appsave" data-p="${pf}">Save</button><button class="btn ghost" data-act="appsetup" data-p="">Close</button></div></div>` : "";
+            <div class="row"><button class="btn primary" data-act="appsave" data-p="${pf}">Save</button><button class="btn ghost" data-act="appsetup" data-p="">Close</button></div></div>`;
+      const card = (pf, name, logo, bg, desc) => {
+        const accs = mine(pf), st = setup?.[pf], g = GUIDE[pf];
+        const act = (ok[pf] ? `<a class="btn sm primary" href="/oauth/${pf}/start">${ic("plus")}${accs.length ? "Add another" : "Connect"}</a>`
+            : admin ? `<button class="btn sm primary" data-act="appsetup" data-p="${pf}">${ic("cog")}Set up</button>` : `<span class="pill">Not set up on this server</span>`)
+          + (ok[pf] && admin ? `<button class="btn sm ghost" data-act="appsetup" data-p="${pf}" title="Change this server's ${name} app">${ic("cog")}</button>` : "");
         return `<div class="appcard"><span class="applogo" style="background:${bg}">${logo}</span>
-          <div class="apptx"><b>${name}</b><span>${desc}</span>${listOf(accs)}</div><div class="appact">${act}</div>${panel}</div>`;
+          <div class="apptx"><b>${name}</b><span>${desc}</span>${listOf(accs)}</div><div class="appact">${act}</div>
+          ${S.setupOpen === pf && st ? setupPanel(pf, name, st, g) : ""}</div>`;
       };
-      body.innerHTML = `<section class="set-sec"><h2>Connected apps</h2><p class="help">Connect the accounts Saksh Clip posts clips to: press Connect, sign in on the platform's own page, and you're back here. Saksh Clip never sees your passwords. Then pick which accounts each creator posts to, in that creator's Setup.</p>
+      // Buffer is the odd one out: it needs nothing registered here, because every Buffer account has its own API
+      // key, and one key brings every channel in that account with it. Signing in through a Buffer app is the
+      // alternative, for whoever runs this server to set up.
+      const bufferCard = () => {
+        const pf = "buffer", name = "Buffer", accs = mine(pf), st = setup?.[pf], on = accs.length > 0;
+        const act = (on ? `<button class="btn sm primary" data-act="bufsync">${ic("refresh")}Refresh channels</button>
+              <button class="btn sm ghost" data-act="bufkey">${ic("plug")}Change key</button>`
+            : `<button class="btn sm primary" data-act="bufkey">${ic("plug")}Use an API key</button>`
+              + (ok[pf] ? `<a class="btn sm ghost" href="/oauth/${pf}/start">${ic("plus")}Sign in with Buffer</a>` : ""))
+          + (admin ? `<button class="btn sm ghost" data-act="appsetup" data-p="${pf}" title="${ok[pf] ? "Change this server's Buffer app" : "Set up signing in with Buffer"}">${ic("cog")}</button>` : "");
+        const key = S.setupOpen === "bufferkey" ? `<div class="appsetup">
+            <p class="sub">Buffer gives every account its own API key, on every plan. Open <a href="https://publish.buffer.com/settings/api" target="_blank" rel="noopener">Settings, API</a> in Buffer, create a key and paste it here. It stays on this server and is never shown again.</p>
+            <div class="fields"><label class="f">Buffer API key<input id="buf_key" type="password" autocomplete="off" spellcheck="false" placeholder="${on ? "Saved. Paste a new key to replace it" : "Buffer shows it once"}"></label></div>
+            <p class="sub">Every channel in your Buffer account then shows up here, and you pick which ones each creator posts to. Buffer comes and fetches each clip from this server as it posts, so Saksh Clip needs a public https address (PEAKCUT_PUBLIC_URL).</p>
+            <div class="row"><button class="btn primary" data-act="bufsave">${on ? "Use this key" : "Connect Buffer"}</button><button class="btn ghost" data-act="bufkey">Close</button></div></div>` : "";
+        return `<div class="appcard"><span class="applogo" style="background:#168EEA">${bf}</span>
+          <div class="apptx"><b>${name}</b><span>One connection for every channel in your Buffer: Instagram, TikTok, YouTube, X, LinkedIn and more.</span>${listOf(accs)}</div>
+          <div class="appact">${act}</div>${key}${S.setupOpen === pf && st ? setupPanel(pf, name, st, GUIDE[pf]) : ""}</div>`;
+      };
+      body.innerHTML = `<section class="set-sec"><h2>Connected apps</h2><p class="help">Connect the accounts Saksh Clip posts clips to: press Connect, sign in on the platform's own page, and you're back here. Saksh Clip never sees your passwords. Buffer takes an API key instead, and brings every channel you have connected there. Then pick which accounts each creator posts to, in that creator's Setup.</p>
         <div class="apps">
           ${card("youtube", "YouTube", yt, "#FF0000", "Post clips to your channel as Shorts.")}
           ${card("instagram", "Instagram", ig, "linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)", "Post clips as Reels. Needs a Creator or Business account.")}
           ${card("tiktok", "TikTok", tt, "#000", "Post clips straight to your TikTok.")}
-        </div></section>`;
+          ${bufferCard()}
+        </div>
+        <p class="sub" style="margin-top:12px">Buffer is a scheduling service: your social accounts are connected to it once, and everything posts from one queue. Saksh Clip sends a clip when its own queue says it is time, and Buffer puts it out at once.</p></section>`;
     }
   } catch (e) { body.innerHTML = `<div class="set-load">${esc(e.message)}</div>`; }
 }
@@ -2447,6 +2475,21 @@ document.addEventListener("click", async e => {
       await send("/api/apps", {platform: d.p, client_id: $("#app_id").value, client_secret: $("#app_secret").value}, "PUT");
       S.setupOpen = ""; S.status = await api("/api/status"); toast("Saved. People can connect now.", "ok"); return drawSettings();
     }
+    if (a === "bufkey") { S.setupOpen = S.setupOpen === "bufferkey" ? "" : "bufferkey"; return drawSettings(); }
+    if (a === "bufsave") {
+      const r = await send("/api/accounts/buffer", {key: $("#buf_key").value});
+      S.setupOpen = ""; S.accounts = r.accounts || [];
+      toast(`Buffer is connected: ${r.channels} channel${r.channels === 1 ? "" : "s"} can take your clips.`, "ok");
+      return drawSettings();
+    }
+    if (a === "bufsync") {
+      b.disabled = true;
+      try {
+        const r = await send("/api/accounts/buffer/sync"); S.accounts = r.accounts || [];
+        toast(`Read ${r.channels} channel${r.channels === 1 ? "" : "s"} from Buffer.`, "ok");
+      } finally { b.disabled = false; }
+      return drawSettings();
+    }
     if (a === "bell") return openBell();
     if (a === "feedback") return openFeedback("bug");
     if (a === "report") return openFeedback("bug", d.ctx);
@@ -2490,9 +2533,11 @@ $("#main").addEventListener("scroll", () => $(".topbar").classList.toggle("stuck
   try { S.status = await api("/api/status"); } catch {}
   const q = new URLSearchParams(location.search);
   if (q.get("connected") || q.get("connect_error")) {
-    const ok = q.get("connected"), err = q.get("connect_error"), nm = q.get("name");
+    const ok = q.get("connected"), err = q.get("connect_error"), nm = q.get("name"), n = Number(q.get("channels") || 0);
     history.replaceState(null, "", location.pathname);
-    setTimeout(() => ok ? toast(`${nm || ok} is connected. Pick it in a creator's Setup to post there.`, "ok") : toast(err, "bad"), 300);
+    const said = ok === "buffer" && n ? `Buffer is connected: ${n} channel${n === 1 ? "" : "s"} can take your clips. Pick them in a creator's Setup.`
+      : `${nm || ok} is connected. Pick it in a creator's Setup to post there.`;
+    setTimeout(() => ok ? toast(said, "ok") : toast(err, "bad"), 300);
   }
   if (q.get("verified")) { history.replaceState(null, "", location.pathname); setTimeout(() => toast("Email confirmed. You're ready to clip.", "ok"), 300); }
   if (q.get("verify_error")) { history.replaceState(null, "", location.pathname); setTimeout(() => toast(q.get("verify_error"), "bad"), 300); }

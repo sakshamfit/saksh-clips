@@ -24,12 +24,13 @@ PeakCut runs as three containers on one Linux server: the app, PostgreSQL, and C
    admin, and no page or web request can make someone an admin: only that command can.
 6. Sign in as that admin, open **Settings, AI**, and add your AI key there (or put it in `.env`).
 
-## Connecting YouTube, Instagram and TikTok
+## Connecting YouTube, Instagram, TikTok and Buffer
 
 People connect their accounts with one click in **Settings, Connected apps**: they press Connect, sign in on the
 platform's own page, and come back. For that, the server needs one app registered with each platform. An admin can
 do it right there: press **Set up** on a platform, follow the steps shown, and paste the app's id and secret (or put
 them in `.env`, see `.env.example`). The redirect address to register is shown in the panel, with a Copy button.
+Buffer is the exception: it needs nothing registered here (see below).
 
 - **YouTube** (Google Cloud): an OAuth client of type Web application, with YouTube Data API v3 turned on. Until
   Google verifies the app, people see a warning screen and uploads stay private.
@@ -39,8 +40,29 @@ them in `.env`, see `.env.example`). The redirect address to register is shown i
 - **TikTok** (TikTok for Developers): an app with Login Kit and the Content Posting API (Direct Post), scopes
   `user.info.basic` and `video.publish`. Until TikTok audits the app, clips are posted as private (PeakCut does
   this by itself and says so on the account).
+- **Buffer** ([publish.buffer.com/settings/api](https://publish.buffer.com/settings/api)): nothing to register.
+  Each person presses **Use an API key** and pastes the key Buffer gives them on that page, which works on every
+  Buffer plan and brings every channel they have connected there: Instagram, TikTok, YouTube, X, LinkedIn,
+  Facebook, Threads, Pinterest, Bluesky, Mastodon and more. Registering a Buffer app (Client ID and secret,
+  redirect URI as shown in the panel) is optional, and only adds the one-click **Sign in with Buffer**.
 
 Instagram and TikTok only accept https redirect addresses.
+
+### Posting through Buffer
+
+Two things are worth knowing about the Buffer route:
+
+- **The site needs a public https address.** Buffer never takes an upload: it comes and fetches the clip from
+  `/pub/…` on your site, so `PEAKCUT_PUBLIC_URL` has to be a domain Buffer can reach over https. On a computer
+  with no public address, Buffer posts fail with a message saying so.
+- **Clips go out at once, not into Buffer's queue.** Saksh Clip's own queue has already decided when each clip is
+  due (spacing, daily caps, a creator's minimum score), and the clip's link is only good for a few hours. So the
+  post is sent to Buffer as "share now". Buffer's own queue and posting schedule for that channel are not used,
+  and Buffer's weekly posting limits still apply: if a channel is at its limit, Buffer refuses the post and it is
+  retried three times before it is marked failed.
+- **View counts stay blank.** Buffer only reports a post's numbers to a personal API key, and not straight away,
+  so posts made through Buffer show no views in the overview. The same clip posted through a direct YouTube or
+  Instagram connection does.
 
 ## Google setup (sign-in and YouTube)
 

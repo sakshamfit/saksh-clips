@@ -16,8 +16,9 @@ creator's live stream and clip the highlights while the stream is still running.
 - **Live clipping.** Records a stream into a rolling buffer and clips as it happens, using loudness, chat activity
   and the transcript.
 - **Workspaces per creator.** Channels, clip settings, posting rules and an activity log for each creator you clip.
-- **Posting.** Connect YouTube, Instagram and TikTok in one click, then queue or auto-post finished clips, with
-  spacing and daily caps (see [DEPLOY.md](DEPLOY.md#connecting-youtube-instagram-and-tiktok) for the one-time setup).
+- **Posting.** Connect YouTube, Instagram and TikTok in one click, or Buffer with an API key to reach every channel
+  in your Buffer at once, then queue or auto-post finished clips, with spacing and daily caps (see
+  [DEPLOY.md](DEPLOY.md#connecting-youtube-instagram-tiktok-and-buffer) for the one-time setup).
 - **No sign-in on your own computer.** It opens straight into the dashboard. On a shared server, switch accounts on
   (`PEAKCUT_ACCOUNTS=1`) for email or Google sign-in and an admin dashboard.
 - **Your own AI.** Arena AI, Gemini, OpenAI, Grok, Groq, OpenRouter, Claude, a local model through Ollama, or anything that

@@ -1332,7 +1332,31 @@ def remove_account(aid: str):
     return {"ok": True}
 
 
-# ---------------------------------------------------------------- connecting YouTube, Instagram and TikTok
+# ---------------------------------------------------------------- Buffer: its API key, and the channels in it
+# Buffer is connected with a key from Buffer's own settings page, so there is nothing this server has to register
+# first. Every channel in that Buffer account then becomes an account here, and creators pick the ones to post to.
+@app.post("/api/accounts/buffer")
+def buffer_connect(body: dict = Body(...)):
+    _throttle("buffer:" + ctx.uid(), 10, 600)
+    try:
+        chans = accounts.buffer_add(str(body.get("key", "")))
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(400, safe.friendly(e, 240))
+    return {"channels": len(chans), "accounts": accounts.list_accounts()}
+
+
+@app.post("/api/accounts/buffer/sync")
+def buffer_refresh():
+    """Read the channels from Buffer again: for one connected there since, or after a new key."""
+    _throttle("buffer:" + ctx.uid(), 30, 600)
+    try:
+        chans = accounts.buffer_sync()
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(400, safe.friendly(e, 240))
+    return {"channels": len(chans), "accounts": accounts.list_accounts()}
+
+
+# ---------------------------------------------------------------- connecting YouTube, Instagram, TikTok and Buffer
 # Connect sends the browser to the platform's own sign-in page; the platform sends it back here, and the person lands
 # on Settings, Connected apps, with the account added (or a message saying what went wrong).
 def _back(**q):
@@ -1366,7 +1390,8 @@ def connect_callback(platform: str, code: str = "", state: str = "", error: str 
         raise
     except Exception as e:  # noqa: BLE001
         return _back(connect_error=f"{name} was not connected: {safe.friendly(e, 240)}")
-    return _back(connected=platform, name=acc["name"])
+    more = {"channels": acc["channels"]} if acc.get("channels") else {}      # Buffer brings several accounts with it
+    return _back(connected=platform, name=acc["name"], **more)
 
 
 @app.get("/pub/{token}.mp4")

@@ -1,11 +1,11 @@
-"""One-click Connect for YouTube, Instagram and TikTok, and posting to each. The platforms are replaced by
+"""One-click Connect for YouTube, Instagram, TikTok and Buffer, and posting to each. The platforms are replaced by
 stand-ins answering the way their documentation says, so nothing leaves this machine."""
 import json, os, sys, tempfile, time
 from urllib.parse import parse_qs, urlparse
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-connect-")
 os.environ.update(DATABASE_URL="", PEAKCUT_ACCOUNTS="1", PEAKCUT_PUBLIC_URL="https://clips.example.com", PEAKCUT_VERIFY_EMAIL="0",
                   GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_CLIENT_FILE="", PEAKCUT_IG_APP_ID="", PEAKCUT_IG_APP_SECRET="",
-                  PEAKCUT_TIKTOK_CLIENT_KEY="", PEAKCUT_TIKTOK_CLIENT_SECRET="")
+                  PEAKCUT_TIKTOK_CLIENT_KEY="", PEAKCUT_TIKTOK_CLIENT_SECRET="", PEAKCUT_BUFFER_CLIENT_ID="", PEAKCUT_BUFFER_CLIENT_SECRET="")
 sys.path.insert(0, ".")
 from pathlib import Path
 import sqlalchemy as sa
@@ -32,7 +32,7 @@ user, b = person("user@example.com")
 
 # ---- nothing is set up: the buttons say so, and only an admin may set it up
 st = b.get("/api/status").json()
-check("nothing can be connected before setup", st["connect"], {"youtube": False, "instagram": False, "tiktok": False})
+check("nothing can be connected before setup", st["connect"], {"youtube": False, "instagram": False, "tiktok": False, "buffer": False})
 check("a normal user cannot see the setup", b.get("/api/apps").status_code, 404)
 check("...or change it", b.put("/api/apps", json={"platform": "tiktok", "client_id": "abcd", "client_secret": "x"}, headers=ORIGIN).status_code, 404)
 r = b.get("/oauth/instagram/start")
@@ -48,7 +48,9 @@ check("secrets are never sent back", any("secret-value" in json.dumps(v) for v i
 check("each platform shows the address to register", apps["tiktok"]["redirect"], BASE + "/oauth/tiktok/callback")
 r = a.put("/api/apps", json={"platform": "tiktok", "client_id": "", "client_secret": "tiktok-secret-value2"}, headers=ORIGIN)
 check("a new secret alone keeps the saved id", accounts.app_keys("tiktok"), ("awtiktokkey123", "tiktok-secret-value2"))
-check("everyone can connect now", b.get("/api/status").json()["connect"], {"youtube": True, "instagram": True, "tiktok": True})
+check("everyone can connect now", b.get("/api/status").json()["connect"],
+      {"youtube": True, "instagram": True, "tiktok": True, "buffer": False})
+check("Buffer has no app here yet, and that is no problem: its key comes from Buffer", accounts.can_connect("buffer"), False)
 
 # ---- the platforms, as stand-ins
 class R:
@@ -60,10 +62,37 @@ class R:
             raise ValueError
         return self._d
 calls, uploads, tt = [], [], {"audited": False, "status": 0}
+buf = {"channels": [], "posts": [], "reject": False, "denied": False, "token_form": {}}
+def buffer_api(payload):
+    """Buffer's one address: every question is a GraphQL question, and the question says what is wanted."""
+    q, v = str(payload.get("query", "")), payload.get("variables") or {}
+    if buf["denied"]:
+        return R(401, {"errors": [{"message": "Unauthorized"}]})
+    if "organizations" in q:
+        return R(200, {"data": {"account": {"organizations": [{"id": "org1", "name": "Clip Co"}]}}})
+    if "channels(" in q:
+        return R(200, {"data": {"channels": buf["channels"] if v.get("org") == "org1" else []}})
+    if "createPost" in q:
+        buf["posts"].append(v.get("input") or {})
+        if buf["reject"]:
+            return R(200, {"data": {"createPost": {"message": "Queue limit reached for this channel"}}})
+        return R(200, {"data": {"createPost": {"post": {"id": "bufpost1", "status": "sending", "dueAt": None,
+                                                        "externalLink": None}}}})
+    return R(200, {"errors": [{"message": "Cannot query that field."}]})
 def post(url, data=None, json=None, headers=None, params=None, timeout=None, content=None):
     calls.append(("POST", url, data or json, headers or {}))
     if url == "https://oauth2.googleapis.com/token":
         return R(200, {"access_token": "yt-access", "refresh_token": "yt-refresh", "expires_in": 3600})
+    if url == "https://auth.buffer.com/token":
+        buf["token_form"] = data or {}
+        if data.get("grant_type") == "refresh_token":
+            return R(200, {"access_token": "buf-access-2", "refresh_token": "buf-refresh-2", "expires_in": 3600})
+        if data.get("code") != "bufcode":
+            return R(400, {"error": "invalid_grant", "error_description": "Authorization code has expired"})
+        return R(200, {"access_token": "buf-access", "refresh_token": "buf-refresh", "expires_in": 3600,
+                       "scope": "posts:write account:read offline_access"})
+    if url == "https://api.buffer.com":
+        return buffer_api(json)
     if url == "https://api.instagram.com/oauth/access_token":
         if data["code"] != "igcode":
             return R(400, {"error_message": "bad code"})
@@ -143,6 +172,59 @@ r = b.get("/oauth/tiktok/callback", params={"code": "c", "state": parse_qs(loc.q
 check("one person's sign-in cannot be finished by another", "connect_error" in r.headers["location"])
 check("an unknown platform does not exist", b.get("/oauth/myspace/start").status_code, 404)
 
+# ---- Buffer: a key from Buffer's own settings, and every channel that key brings with it
+CHANS = [{"id": "ch_ig", "name": "@clipper", "service": "instagram", "organizationId": "org1", "type": "profile",
+          "isDisconnected": False, "isLocked": False, "isQueuePaused": False, "externalLink": "https://instagram.com/clipper"},
+         {"id": "ch_yt", "name": "Clipper Clips", "service": "youtube", "organizationId": "org1", "type": "channel",
+          "isDisconnected": False, "isLocked": False, "isQueuePaused": False, "externalLink": ""},
+         {"id": "ch_x", "name": "@clipper", "service": "twitter", "organizationId": "org1", "type": "profile",
+          "isDisconnected": True, "isLocked": False, "isQueuePaused": False, "externalLink": ""}]
+buf.update(channels=CHANS, posts=[], reject=False, denied=False)
+def connected():
+    with ctx.as_user(user.id):
+        return accounts.buffer_connected()
+check("Buffer: something that isn't a key is refused", b.post("/api/accounts/buffer", json={"key": "not a key!"}, headers=ORIGIN).status_code, 400)
+buf["denied"] = True
+r = b.post("/api/accounts/buffer", json={"key": "v1.a-key-buffer-refuses"}, headers=ORIGIN)
+buf["denied"] = False
+check("Buffer: a key Buffer refuses is not kept", (r.status_code, connected()), (400, False))
+r = b.post("/api/accounts/buffer", json={"key": "v1.a-long-buffer-api-key"}, headers=ORIGIN)
+check("Buffer: an API key connects it, with no app on this server", (r.status_code, r.json()["channels"]), (200, 3))
+rows = {x["id"]: x for x in b.get("/api/accounts").json() if x["platform"] == "buffer"}
+check("Buffer: every channel becomes an account of its own", sorted(rows), ["bf_ch_ig", "bf_ch_x", "bf_ch_yt"])
+check("Buffer: each says which network it is, for the post queue", rows["bf_ch_ig"]["name"], "@clipper (Instagram)")
+check("Buffer: and which Buffer organization it belongs to", rows["bf_ch_yt"]["detail"], "Clip Co")
+check("Buffer: a channel Buffer can't post to says why", "Disconnected" in rows["bf_ch_x"]["detail"], True)
+check("Buffer: they are all called Buffer, so a creator's Setup groups them", {x["label"] for x in rows.values()}, {"Buffer"})
+check("Buffer: the key never reaches the page", "a-long-buffer-api-key" in b.get("/api/accounts").text, False)
+check("Buffer: another person gets none of it", a.get("/api/accounts").json(), [])
+buf["denied"] = True
+r = b.post("/api/accounts/buffer", json={"key": "v1.a-second-key-buffer-refuses"}, headers=ORIGIN)
+buf["denied"] = False
+check("Buffer: a bad second key leaves the working one alone", (r.status_code, connected()), (400, True))
+buf["channels"] = CHANS[:2]                      # the X channel was dropped in Buffer since
+r = b.post("/api/accounts/buffer/sync", headers=ORIGIN)
+check("Buffer: reading the channels again drops the one that is gone",
+      (r.status_code, r.json()["channels"], "bf_ch_x" in {x["id"] for x in r.json()["accounts"]}), (200, 2, False))
+buf["channels"] = CHANS
+check("Buffer: and brings it back", b.post("/api/accounts/buffer/sync", headers=ORIGIN).json()["channels"], 3)
+
+# ---- Buffer can also be signed in with, through an app registered here
+r = a.put("/api/apps", json={"platform": "buffer", "client_id": "buf-client-1234", "client_secret": "buf-secret-value"}, headers=ORIGIN)
+check("Buffer: an app for the one-click sign-in can be added too", (r.status_code, r.json()["buffer"]["ready"]), (200, True))
+check("Buffer: and then everyone can sign in", b.get("/api/status").json()["connect"]["buffer"], True)
+check("Buffer: its secret is never sent back", "buf-secret-value" in a.get("/api/apps").text, False)
+loc, back = connect(b, "buffer", "bufcode")
+q = parse_qs(loc.query)
+check("Buffer: Buffer's own sign-in page, with PKCE and permission to post",
+      (loc.netloc, loc.path, q["client_id"][0], q["code_challenge_method"][0], q["scope"][0], len(q["code_challenge"][0]) > 20),
+      ("auth.buffer.com", "/auth", "buf-client-1234", "S256", "posts:write account:read offline_access", True))
+check("Buffer: signed in, and the page is told how many channels came",
+      ("connected=buffer" in back.headers["location"], "channels=3" in back.headers["location"]), (True, True))
+check("Buffer: the PKCE value and the redirect went with the code",
+      (bool(buf["token_form"].get("code_verifier")), buf["token_form"].get("redirect_uri")), (True, BASE + "/oauth/buffer/callback"))
+check("Buffer: tokens never reach the page", any(t in b.get("/api/accounts").text for t in ("buf-access", "buf-refresh")), False)
+
 # ---- the one-hour links Instagram fetches clips from
 with ctx.as_user(user.id):
     jd = config.user_dir(user.id) / "jobs" / "job-12345678" / "clips"
@@ -186,6 +268,49 @@ with ctx.as_user(user.id):
     acc = accounts.get(ttacc["id"]); acc["expires"] = 0; accounts._put(acc)
     accounts._tt_token(accounts.get(ttacc["id"]))
     check("TikTok: an old sign-in is renewed, and the new refresh token kept", accounts.get(ttacc["id"])["refresh_token"], "tt-refresh-2")
+
+    # ---- posting through Buffer: one channel at a time, and Buffer comes and fetches the clip
+    bufacc, bufyt = accounts.get("bf_ch_ig"), accounts.get("bf_ch_yt")
+    buf["posts"].clear()
+    rid, url = accounts.buffer_upload(bufacc, jd / "clip01.mp4", "My caption\n\n#fyp", "My title", "job-12345678", "public")
+    sent = buf["posts"][-1]
+    check("Buffer: the clip goes out at once, from a signed link on this server",
+          (sent["mode"], sent["schedulingType"], sent["channelId"], sent["assets"][0]["video"]["url"].startswith(BASE + "/pub/")),
+          ("shareNow", "automatic", "ch_ig", True))
+    check("Buffer: one video, with a thumbnail from a second in",
+          (len(sent["assets"]), sent["assets"][0]["video"]["metadata"]["thumbnailOffset"]), (1, 1000))
+    check("Buffer: an Instagram channel is told the clip is a Reel", sent["metadata"]["instagram"], {"type": "reel", "shouldShareToFeed": True})
+    check("Buffer: the post is known by Buffer's id, with no link until it is out", (rid, url), ("bufpost1", ""))
+    try:
+        accounts.buffer_upload(bufacc, jd / "clip01.mp4", "My caption")
+        check("Buffer: a clip with no job to fetch from is refused", False)
+    except RuntimeError as e:
+        check("Buffer: a clip with no job to fetch from is refused", "which clip" in str(e), True)
+
+    accounts.buffer_upload(bufyt, jd / "clip01.mp4", "A description", "A title", "job-12345678", "unlisted")
+    y = buf["posts"][-1]["metadata"]["youtube"]
+    check("Buffer: YouTube gets a title, a category and the creator's privacy",
+          (y["title"], y["categoryId"], y["privacy"], y["madeForKids"]), ("A title", "20", "unlisted", False))
+    check("Buffer: a caption too long for X is cut to fit", len(accounts._buffer_text("word " * 200, "twitter")) <= 280, True)
+
+    buf["reject"] = True
+    try:
+        accounts.buffer_upload(bufacc, jd / "clip01.mp4", "cap", "t", "job-12345678")
+        check("Buffer: a refusal is passed on", False)
+    except RuntimeError as e:
+        check("Buffer: a refusal is passed on in Buffer's own words", "Queue limit" in str(e), True)
+    buf["reject"] = False
+
+    c = accounts._buffer_cred(); c.update(kind="oauth", expires=0, refresh="buf-refresh"); accounts._buffer_put(c)
+    accounts._buf_token(accounts._buffer_cred())
+    check("Buffer: an old sign-in is renewed, and the new refresh token kept", accounts._buffer_cred()["refresh"], "buf-refresh-2")
+
+    ids = [x["id"] for x in accounts.list_accounts() if x["platform"] == "buffer"]
+    for aid in ids[:-1]:
+        accounts.remove(aid)
+    check("Buffer: the sign-in stays while one channel is left", accounts.buffer_connected(), True)
+    accounts.remove(ids[-1])
+    check("Buffer: the last channel takes the sign-in with it", accounts.buffer_connected(), False)
 
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
 import shutil; db.engine.dispose(); shutil.rmtree(os.environ["PEAKCUT_DATA"], ignore_errors=True)
