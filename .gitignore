@@ -30,3 +30,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# ---- local binaries (ffmpeg/ffprobe fetched for this machine)
+/bin/
