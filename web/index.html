@@ -1471,7 +1471,9 @@ document.addEventListener("click", e => {
     sg.parentElement.querySelectorAll("[data-seg]").forEach(b => b.setAttribute("aria-pressed", String(b === sg))); return; }
   const st = e.target.closest("[data-step]");
   if (st) { const i = $("#" + st.dataset.step), s = Number(i.step) || 1, d = Number(st.dataset.d);
-    const v = Math.min(Number(i.max), Math.max(Number(i.min), (Number(i.value) || 0) + d * s)); i.value = v; }
+    const v = Math.min(Number(i.max), Math.max(Number(i.min), (Number(i.value) || 0) + d * s)); i.value = v;
+    i.dataset.touched = "1";                                            // chosen here, so the chooser starts from it
+    if (i.dataset.step === "p_max") return; }
 });
 document.addEventListener("keydown", e => {
   const p = e.target.closest?.(".pick"); if (!p) return;
@@ -1560,7 +1562,7 @@ function drawAtt() {
   const b = $("#goBtn");
   if (b) { b.disabled = A.busy;
     const k = A.files.length + A.links.filter(l => l.state === "ok").length;
-    b.innerHTML = A.busy ? `${ic("up")}Sending…` : A.queued ? `${ic("clock")}Finding video…` : `${ic("scissors")}Make clips${k > 1 ? ` (${k})` : ""}`; }
+    b.innerHTML = A.busy ? `${ic("up")}Sending…` : A.queued ? `${ic("clock")}Finding video…` : `${ic("sliders")}Choose the look${k > 1 ? ` (${k})` : ""}`; }
 }
 
 async function lookUp(u) {
@@ -1674,15 +1676,29 @@ function sendFile(f, who, options) {
    every layout drawn from the video's own picture. Clipping only starts when Start clipping is pressed, so nothing
    is spent before the choice is made. */
 const PICK = {open: false, resolve: null, opts: null, target: null, look: {}};
+const LOOK_STYLES = {bounce: "Bounce", hype: "Hype", clean: "Clean"};
+const LOOK_LAYOUTS = {blur: "Full frame + blurred fill", zoom: "Zoomed in + blurred fill", crop: "Fill screen (centre crop)",
+                      gameplay: "Gameplay fills the screen, facecam in the corner"};
 const LAYOUT_WHY = {blur: "The whole picture, with a blurred copy filling the rest.", zoom: "The picture larger, the edges blurred away.",
                     crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner."};
 
+/* What the chooser starts on: the creator's own settings, then whatever was chosen for this creator last time
+   (kept in this browser), then the number in the Options panel if it was changed there. Only the four things the
+   chooser asks about are here: the shortest and longest clip come from the Options panel and are never touched. */
 function pickDefaults(A) {
   const c = creator() || S.creators.find(x => x.id === targetCreator());
-  const last = S.lastPick || {};
+  const key = targetCreator() || "none";
+  let kept = {};
+  try { kept = (JSON.parse(localStorage.getItem("anhy_look") || "{}"))[key] || {}; } catch {}
+  const last = {...(S.lastPick || {})};                // this session's choice, for any creator
   const fallback = {style: c?.style ?? "bounce", layout: c?.layout ?? "blur", captions: c?.captions !== false,
-                    max_clips: c?.max_clips ?? 6, min_len: c?.min_len ?? 15, max_len: c?.max_len ?? 60};
-  return {...fallback, ...last};   // what was chosen last time wins: it is usually the same again
+                    max_clips: c?.max_clips ?? 6};
+  const got = {...fallback, ...kept, ...last};
+  const box = $("#o_max");                             // "How many" in the Options panel
+  if (box?.dataset.touched && Number(box.value) > 0) {  // only when it was changed there, not just filled in
+    got.max_clips = Number(box.value);
+  }
+  return got;
 }
 
 /* The picture the previews are drawn from: the biggest video already added, either a link's own thumbnail or a
@@ -1789,22 +1805,25 @@ function pickState() {
 function drawPick(opts, A) {
   const dlg = $("#pickdlg");
   const src = pickSource(A);
+  // The page's own lists, unless they never arrived (which is the case for a moment after a reload).
+  const styles = Object.keys(S.status?.styles || {}).length ? Object.keys(S.status.styles) : Object.keys(LOOK_STYLES);
+  const layouts = Object.keys(S.status?.layouts || {}).length ? Object.keys(S.status.layouts) : Object.keys(LOOK_LAYOUTS);
   const lay = layout => `<button type="button" class="pd-opt" data-layout="${layout}" aria-pressed="${opts.layout === layout}" title="${esc(LAYOUT_WHY[layout] || "")}">
       <span class="lay-prev ${esc(layout)}" style="height:64px"><span class="ph" style="width:36px;height:64px"><i></i></span></span>${esc(LAYOUT_SHORT[layout] || layout)}</button>`;
-  const sty = k => `<button type="button" class="pd-opt" data-style="${k}" aria-pressed="${opts.style === k}" title="${esc(S.status.styles[k] || k)}">
-      <span class="cap-prev" style="height:64px;font-family:${CAP_LOOK[k]?.font || "inherit"},sans-serif;font-weight:${CAP_LOOK[k]?.w || 400}">${CAP_LOOK[k]?.up === false ? "Clip <b>this</b>" : "CLIP <b>THIS</b>"}</span>${esc(S.status.styles[k] || k)}</button>`;
+  const sty = k => `<button type="button" class="pd-opt" data-style="${k}" aria-pressed="${opts.style === k}" title="${esc(S.status?.styles?.[k] || LOOK_STYLES[k] || k)}">
+      <span class="cap-prev" style="height:64px;font-family:${CAP_LOOK[k]?.font || "inherit"},sans-serif;font-weight:${CAP_LOOK[k]?.w || 400}">${CAP_LOOK[k]?.up === false ? "Clip <b>this</b>" : "CLIP <b>THIS</b>"}</span>${esc(S.status?.styles?.[k] || LOOK_STYLES[k] || k)}</button>`;
   const n = A.files.length + A.links.filter(l => l.state === "ok").length;
   dlg.innerHTML = `<form method="dialog" class="pd"><div>
       <h2>Choose the look before clipping</h2>
       <p class="pd-sub">${n === 1 ? "Pick these now, so the clips come out the way you want them the first time."
         : `The same look is used for all ${n} videos in this batch, so nothing is made the wrong shape.`}</p></div>
-    <div><h3>Framing</h3><div class="pd-grid">${Object.keys(S.status.layouts).map(lay).join("")}</div></div>
+    <div><h3>Framing</h3><div class="pd-grid">${layouts.map(lay).join("")}</div></div>
     <div><h3>Caption style</h3>
       <label class="sw" style="margin-bottom:10px"><input type="checkbox" id="p_caps" ${opts.captions ? "checked" : ""}>Generate captions</label>
-      <div class="pd-grid caps">${Object.keys(S.status.styles).map(sty).join("")}</div></div>
+      <div class="pd-grid caps">${styles.map(sty).join("")}</div></div>
     <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
       <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
-        <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status.styles[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
+        <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status?.styles?.[opts.style] || LOOK_STYLES[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
         <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--brand-ink);display:${opts.layout === "gameplay" ? "" : "none"}">A webcam is only found in a stream recording. Anything else fills the screen instead.</p></div></div>
     <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
       ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
@@ -1827,7 +1846,14 @@ function openPick(A) {
       PICK.open = false;
       const ok = dlg.returnValue === "go";
       const got = ok ? {...pickState(), captions: dlg.querySelector("#p_caps")?.checked !== false} : null;
-      if (ok) S.lastPick = {style: got.style, layout: got.layout, captions: got.captions, max_clips: got.max_clips};
+      if (ok) {
+        S.lastPick = {style: got.style, layout: got.layout, captions: got.captions, max_clips: got.max_clips};
+        try {
+          const all = JSON.parse(localStorage.getItem("anhy_look") || "{}");
+          all[targetCreator() || "none"] = S.lastPick;
+          localStorage.setItem("anhy_look", JSON.stringify(all));
+        } catch {}
+      }
       PICK.opts = null; PICK.target = null; PICK.resolve = null;
       dlg.innerHTML = "";
       res(got);
@@ -2507,6 +2533,7 @@ document.addEventListener("change", async e => {
     if (t.id === "o_captions") t.dataset.overridden = "true";
     syncCaptionStyle(t);
   }
+  if (t.id === "o_max") t.dataset.touched = "1";                        // typed in the Options panel
   if (t.id === "ai_provider") {
     $("#ai_models").innerHTML = "";
     if (S.ai) {
