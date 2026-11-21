@@ -597,6 +597,16 @@ def _run_job(job):
         audio_file = media.download_audio(src["url"], d, lambda p: _set(job, progress=0.03 + 0.1 * p))
     else:
         pieces, audio_file = False, Path(src["path"])
+        if not audio_file.is_file():
+            # A video picked from a folder on this computer is usually linked into its own folder, but a drive that
+            # cannot be linked to leaves it where it is. Then it has to stay there, and this says so in plain words
+            # instead of letting ffmpeg's own complaint be the whole answer.
+            if src.get("local"):
+                where = src.get("from") or "the folder it was picked from"
+                raise RuntimeError(f"The video isn't in {where} any more. It was picked from a folder on this computer "
+                                   "and worked on where it is, so that file has to stay put until its clips are made. "
+                                   "Put it back, or add the video again.")
+            raise RuntimeError("Anhy Clips' copy of this video has gone. Add the video again.")
         info = media.probe(audio_file)
         if info["duration"] > config.MAX_VIDEO_HOURS * 3600:
             raise RuntimeError(f"That video is longer than {config.MAX_VIDEO_HOURS:g} hours, which is the limit.")

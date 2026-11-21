@@ -5,16 +5,19 @@ Based on [PeakCut](https://github.com/haziqahmedqasmi/peakcut) by PeakCut contri
 Turn long videos and live streams into captioned vertical clips, ready to post. Free and open source: run it on
 your own computer or server, with your own AI key.
 
-Paste a YouTube, Twitch or Kick link (or upload a file), choose how the clips should look, and Anhy Clips finds the
-moments worth clipping, cuts them to 9:16, adds word-by-word captions and a hook, and can post them to your
-connected accounts. It can also record a creator's live stream and clip the highlights while the stream is still
-running.
+Paste a YouTube, Twitch or Kick link, upload a file, or point it at a video that is already in a folder on your
+computer. Choose how the clips should look, and Anhy Clips finds the moments worth clipping, cuts them to 9:16, adds
+word-by-word captions and a hook, and can post them to your connected accounts. It can also record a creator's live
+stream and clip the highlights while the stream is still running.
 
 ## What it does
 
 - **Clips from any video.** You choose the framing and the caption style before anything is made, with a preview
   drawn from the video itself; then it transcribes the audio, asks an AI which moments would hold a stranger's
   attention, and renders each one in that style.
+- **A video already on your computer.** Press **From a folder**, open the folder your video was downloaded to and
+  pick it: nothing is uploaded and nothing is downloaded again, clipping starts on the file itself
+  (see [below](#a-video-that-is-already-on-your-computer)).
 - **Live clipping.** Records a stream into a rolling buffer and clips as it happens, using loudness, chat activity
   and the transcript.
 - **Workspaces per creator.** Channels, clip settings, posting rules and an activity log for each creator you clip.
@@ -160,6 +163,28 @@ default it is the `data` folder inside Anhy Clips. **Settings, Storage** shows t
 has, opens it in one click, and lets you move it to another drive: choose the new folder, and Anhy Clips moves
 everything there the next time it starts. If the drive is nearly full, Anhy Clips says so and stops taking new videos
 until there is room. (`ANHY_DATA` in `.env` still works and takes priority.)
+
+## A video that is already on your computer
+
+A video does not have to travel to be clipped. If it is already in a folder Anhy Clips can reach — your Downloads,
+a drive of recordings, or the folder your download tool writes to — press **From a folder** on the composer, open
+that folder and pick the video. Clipping starts on the file itself: nothing is uploaded, nothing is downloaded
+again, and no second copy is made. The file is *linked* into that video's own folder, which is instant and takes no
+extra room, and the clips carry on working even if you delete the original afterwards. (A drive that cannot be
+linked to — a memory stick or a network folder — leaves the video where it is and works on it there; the video then
+says so, and the file has to stay put until its clips are made.)
+
+Folders are offered from wherever videos usually are (Downloads, Videos, Movies, Desktop), and you can add any
+folder of your own: open it in the picker and press **Keep this folder in the list**, or name it in `.env` with
+`ANHY_LOCAL_FOLDERS` (several folders separated by semicolons). Files that are still downloading (`.part`,
+`.crdownload`) are not offered, and a file written to in the last few seconds is marked, in case it has not
+finished arriving. Videos of any kind ffmpeg can read are offered (mp4, mkv, mov, webm, avi, ts, mpg and the
+rest) — the same list the uploader takes, so a file that can be picked can also be uploaded, and the other way
+round.
+
+On your own computer there is nothing else to do. On a server where people sign in (`ANHY_ACCOUNTS=1`), only an
+admin sees the folders, because they belong to that machine and not to its visitors; `ANHY_LOCAL_PICK=0` turns the
+whole thing off.
 
 ## Updating
 

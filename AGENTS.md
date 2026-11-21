@@ -40,6 +40,7 @@ are there, and only then offer to delete the old folder. Never delete anything w
 | `anhy/transcribe.py`, `anhy/asr_worker.py` | Speech to text, here or on a second machine |
 | `anhy/render.py` | Cutting, layouts and captions (ffmpeg and Pillow) |
 | `anhy/media.py` | Downloading (yt-dlp), probing, audio |
+| `anhy/local.py` | Videos already in a folder on this computer: which folders may be opened, and taking a picked video in without a second copy |
 | `anhy/auth.py`, `anhy/account.py`, `anhy/admin.py` | Sign-in, deleting things, the admin dashboard |
 | `anhy/db.py` | Database tables (SQLAlchemy core; SQLite or PostgreSQL) |
 | `web/index.html` | The whole signed-in app, one file, no build step |

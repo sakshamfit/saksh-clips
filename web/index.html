@@ -299,7 +299,9 @@ label.ck input{accent-color:var(--brand);margin:0}
 .lp{display:flex;align-items:center;gap:12px;padding:8px;border-radius:12px;background:var(--muted);animation:rise .28s ease both}
 .composer.compact .lp{background:#fff}
 .lp .th{position:relative;flex:none;width:112px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#2A1A12}
-.lp .th img{width:100%;height:100%;object-fit:cover;display:block}
+.lp .th img{width:100%;height:100%;object-fit:cover;display:block;position:relative}
+.lp .th .ph-ic{position:absolute;inset:0;display:grid;place-items:center;color:#9A7A63}
+.lp .th .ph-ic svg{width:20px;height:20px}
 .lp .th .du{position:absolute;right:5px;bottom:5px;background:rgba(20,12,8,.82);color:#fff;font-size:11px;font-weight:600;padding:1px 6px;border-radius:6px}
 .lp .tx{min-width:0;flex:1}
 .lp .tx b{display:block;font-size:14px;font-weight:600;color:var(--brand-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -456,6 +458,31 @@ dialog.pickdlg{border:1px solid var(--line);background:#fff;color:var(--text);bo
 .pd-foot .grow{flex:1}
 .pd-foot .hint{font-size:12px;color:var(--faint)}
 @media (max-width:640px){.pd-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pd-grid.caps{grid-template-columns:repeat(3,minmax(0,1fr))}.pd-look{grid-template-columns:90px minmax(0,1fr)}.pd-look .pd-shot{width:90px}}
+
+/* ---------- picking a video that is already in a folder on this computer */
+.lb-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lb-path{flex:1;min-width:180px;height:36px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;font-size:13px;background:#fff;color:var(--text)}
+.lb-path:focus{outline:2px solid var(--brand-soft);outline-offset:-1px;border-color:var(--brand)}
+.lb-where{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint);min-height:20px}
+.lb-where b{color:var(--brand-ink);font-weight:600;word-break:break-all}
+.lb-list{display:flex;flex-direction:column;gap:3px;max-height:min(50vh,400px);overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px;background:#fff}
+.lb-row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;cursor:pointer;font:inherit;color:var(--text);transition:background-color .15s ease,color .15s ease}
+.lb-row:hover,.lb-row:focus-visible{background:var(--muted)}
+.lb-row>i{flex:none;width:18px;display:grid;place-items:center;color:var(--dim)}
+.lb-row>i svg{width:16px;height:16px}
+.lb-row .nm{flex:1;min-width:0;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-row .sz{flex:none;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.lb-row[aria-pressed=true]{background:var(--brand-soft);color:var(--brand-ink)}
+.lb-row[aria-pressed=true]>i,.lb-row[aria-pressed=true] .sz{color:var(--brand-deep)}
+.lb-row:disabled{opacity:.55;cursor:default}
+.lb-row:disabled:hover{background:transparent}
+.lb-row .sz svg{width:14px;height:14px;display:block;color:var(--faint)}
+.lb-sec{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:8px 10px 3px}
+.lb-empty{padding:22px 14px;text-align:center;color:var(--faint);font-size:13px}
+.lb-empty svg{width:20px;height:20px;display:block;margin:0 auto 8px}
+.lb-foot{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:14px;flex-wrap:wrap}
+.lb-foot .grow{flex:1}
+@media (max-width:640px){.lb-row .sz{display:none}.lb-list{max-height:46vh}}
 
 /* ---------- home blocks */
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
@@ -885,8 +912,9 @@ dialog[open]{animation:fadein .16s ease}
 </div>
 <dialog id="clipdlg"></dialog>
 <dialog id="pickdlg" class="pickdlg"></dialog>
+<dialog id="localdlg" class="pickdlg"></dialog>
 <dialog id="formdlg"></dialog>
-<input type="file" id="file" accept="video/*" multiple hidden>
+<input type="file" id="file" accept="video/*,.mkv,.webm,.mov,.m4v,.ts,.mts,.flv,.avi,.mpg,.mpeg,.wmv,.m2ts,.ogv,.3gp,.vob" multiple hidden>
 <div id="toasts" role="status" aria-live="polite"></div>
 <div class="pop" id="bellpop" role="dialog" aria-label="Notifications" hidden></div>
 <div class="pop menu" id="acctpop" role="menu" hidden></div>
@@ -994,8 +1022,8 @@ function startTour() {
   const steps = [
     {t: "Welcome to Anhy Clips", x: "Long videos and live streams go in, captioned vertical clips come out. Here is a quick look around.",
      chips: [["link", "Paste a link"], ["scissors", "Get clips", 1], ["radio", "Live streams"], ["send", "Post them"]]},
-    {t: "Start with any video", x: "Paste a YouTube, Twitch or Kick link here, or upload a file. Anhy Clips finds the best moments and makes each one a short with captions.",
-     sel: "#addform", dock: "bottom", chips: [["link", "YouTube"], ["link", "Twitch"], ["link", "Kick"], ["up", "Upload", 1]]},
+    {t: "Start with any video", x: "Paste a YouTube, Twitch or Kick link here, upload a file, or pick a video that is already in a folder on this computer — that one is never uploaded or downloaded again. Anhy Clips finds the best moments and makes each one a short with captions.",
+     sel: "#addform", dock: "bottom", chips: [["link", "YouTube"], ["link", "Twitch"], ["up", "Upload"], ["folder", "From a folder", 1]]},
     {t: "Your day at a glance", x: "Home shows what is recording, how many clips were made and posted today, and what is waiting to go out.",
      sel: "#ov .tiles", dock: "bottom", chips: [["radio", "Recording"], ["scissors", "Clips today", 1], ["send", "Posted"], ["clock", "Waiting"]]},
     {t: "Every video in one place", x: "All videos lists everything you have processed. Open a video to see its clips, trim them, change the captions or download them.",
@@ -1419,8 +1447,8 @@ function drawAdd(variant) {
     <div class="att" id="att"><div><div class="att-in" id="attIn"></div></div></div>
     <div class="composer-bar">
       <button type="button" class="chip" data-act="pickfile">${ic("up")}Upload video</button>
+      ${S.status.local_pick ? `<button type="button" class="chip" data-act="pickfolder" title="Use a video that is already in a folder on this computer: nothing is uploaded, and nothing is downloaded again">${ic("folder")}From a folder</button>` : ""}
       ${c ? "" : picker("o_creator", "File under creator", [{v:"", label:"No creator", icon:"user"}, ...S.creators.map(x => ({v:x.id, label:x.name, img:x.profile?.pic && x.profile.channel === x.channel ? avatarUrl(x) : ""}))], "")}
-      <button type="button" class="chip" data-act="openpick">${ic("sliders")}Framing &amp; style</button>
       <button type="button" class="chip" data-act="toggleopts" aria-expanded="false">${ic("cog")}Options</button>
       <span class="grow"></span><span class="hint">or drop a video file here</span>
       <button class="btn primary" id="goBtn" title="Choose the framing and the caption style, then start">${ic("sliders")}Choose the look</button>
@@ -1504,22 +1532,27 @@ function jobOptions() {
    shows up under another. Links move out of the box into the list as soon as they are recognised. */
 const DRAFTS = {};
 const draftKey = () => creatorId() ? "c:" + creatorId() : S.view;
-const att = () => DRAFTS[draftKey()] ||= {files: [], links: [], note: null, busy: false, queued: false};
-const VIDEO_EXT = /\.(mp4|mov|mkv|webm|m4v|ts|flv)$/i;
+const att = () => DRAFTS[draftKey()] ||= {files: [], locals: [], links: [], note: null, busy: false, queued: false};
+/* What counts as a video: the server's own list, so a file it would take is never turned away here (a .mkv or a
+   .ts from a download often has no MIME type, so the ending is what decides). The same list is the fallback. */
+const VIDEO_KINDS = [".mp4", ".mov", ".mkv", ".webm", ".m4v", ".ts", ".flv", ".avi", ".mpg", ".mpeg", ".wmv", ".m2ts", ".mts", ".ogv", ".3gp", ".vob"];
+const videoKinds = () => (S.status?.video_kinds?.length ? S.status.video_kinds : VIDEO_KINDS);
+const fileEnding = n => { const s = String(n || ""), i = s.lastIndexOf("."); return i < 0 ? "" : s.slice(i).toLowerCase(); };
+const isVideoName = n => videoKinds().some(k => k.toLowerCase() === fileEnding(n));
 const fmtLen = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`; };
 const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.max(1, Math.round(b / 1e6)) + " MB";
 const isChannel = u => /^(https?:\/\/)?(www\.)?(twitch\.tv|kick\.com)\/[A-Za-z0-9_]+\/?$/.test(u) || /youtube\.com\/(@[^/]+|channel\/[^/]+)\/?(live|videos|streams)?\/?$/.test(u);
 const looksLink = u => /^https?:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|twitch\.tv|kick\.com)\//i.test(u);
 const fullLink = u => /[?&]v=[\w-]{11}\b|youtu\.be\/[\w-]{11}\b|\/(shorts|live|embed)\/[\w-]{11}\b|twitch\.tv\/videos\/\d{6,}|clips\.twitch\.tv\/\w|twitch\.tv\/\w+\/clip\/\w|kick\.com\/[\w-]+\/(videos?|clips?)\/[\w-]{6,}/i.test(u);
 const batchMax = () => S.status.max_batch || 5;
-const batchUsed = A => A.files.length + A.links.filter(l => l.state !== "bad").length;
+const batchUsed = A => A.files.length + (A.locals || []).length + A.links.filter(l => l.state !== "bad").length;
 const newId = () => Math.random().toString(36).slice(2);
 
 function attach(list) {
   const A = att(), max = (S.status.max_upload_mb || 2048) * 1024 * 1024;
   let full = false;
   for (const f of list || []) {
-    if (!(f.type.startsWith("video/") || VIDEO_EXT.test(f.name))) { toast(`${f.name} is not a video file.`, "bad"); continue; }
+    if (!(f.type.startsWith("video/") || isVideoName(f.name))) { toast(`${f.name} is not a video file.`, "bad"); continue; }
     if (f.size > max) { toast(`${f.name} is over the ${S.status.max_upload_mb} MB limit.`, "bad"); continue; }
     if (A.files.some(x => x.file.name === f.name && x.file.size === f.size)) continue;
     if (batchUsed(A) >= batchMax()) { full = true; continue; }
@@ -1528,7 +1561,26 @@ function attach(list) {
   if (full) toast(`You can send up to ${batchMax()} videos at a time. Start these, then add more.`, "bad");
   drawAtt();
 }
-function canGo(A = att()) { return !A.busy && (A.files.length > 0 || A.links.some(l => l.state === "ok")); }
+/* A video that is already in a folder on this computer: it is added by where it is on the disk, so nothing is
+   uploaded and nothing is fetched again. Clipping starts on the file itself. */
+const localThumb = p => "/api/local/thumb?path=" + encodeURIComponent(p);
+function attachLocal(list, A = att()) {
+  let full = false, added = 0;
+  for (const v of list || []) {
+    if ((A.locals || []).some(x => x.path === v.path)) continue;
+    if (batchUsed(A) >= batchMax()) { full = true; continue; }
+    (A.locals ||= []).push({id: newId(), path: v.path, name: v.name, size: v.size || 0, dur: v.duration || 0,
+                            fresh: !!v.fresh, state: v.problem ? "error" : "ready", err: v.problem || ""});
+    added++;
+  }
+  A.note = null;
+  drawAtt();
+  if (full) toast(`You can send up to ${batchMax()} videos at a time. Start these, then add more.`, "bad");
+  else if (added) toast(added === 1 ? "Added. Nothing is uploaded: Anhy Clips works on that file where it is."
+                                    : `${added} videos added. Nothing is uploaded: they are worked on where they are.`, "ok");
+  return added;
+}
+function canGo(A = att()) { return !A.busy && (A.files.length > 0 || (A.locals || []).length > 0 || A.links.some(l => l.state === "ok")); }
 
 /* one row style for everything: picture on the left, name and details, state on the right */
 function rowHtml(A, {id, kind, thumb, len, title, sub, side, bar}) {
@@ -1561,17 +1613,26 @@ function drawAtt() {
   h += A.links.map(l => {
     if (l.state === "wait") return `<div class="lp wait" data-row="${l.id}"><div class="th"></div><div class="tx"><span class="sk" style="width:62%"></span><span class="sk" style="width:34%"></span></div>
       ${A.busy ? "" : `<button type="button" class="rm" data-rm="link" data-id="${l.id}" aria-label="Remove link">${ic("x")}</button>`}</div>`;
-    if (l.state === "bad") return `<div class="lp bad" data-row="${l.id}">${ic("warn")}<span><b>${esc(l.url)}</b>${esc(l.msg)}</span>
+    if (l.state === "bad") return `<div class="lp bad" data-row="${l.id}">${ic("warn")}<span><b>${esc(l.url)}</b>${esc(l.msg)}${S.status.local_pick ? ` <button type="button" data-act="pickfolder" title="Use a video that is already in a folder on this computer" style="border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:#7A1F1F;text-decoration:underline;cursor:pointer;padding:0">Pick the file from a folder instead</button>` : ""}</span>
       ${A.busy ? "" : `<button type="button" class="rm" data-rm="link" data-id="${l.id}" aria-label="Remove link">${ic("x")}</button>`}</div>`;
     const i = l.info;
     return rowHtml(A, {id: l.id, kind: "link", thumb: i.thumb ? `<img src="${i.thumb}" alt="">` : "", len: i.duration && !i.is_live ? fmtLen(i.duration) : "",
       title: i.title, sub: esc(i.uploader || "Video link"),
       side: l.sending ? `<span class="ok up">Sending</span>` : i.is_live ? `<span class="ok live"><i></i>Live now</span>` : `<span class="ok">${ic("check")}Ready</span>`});
   }).join("");
+  h += (A.locals || []).map(f => rowHtml(A, {id: f.id, kind: "local",
+    thumb: `<span class="ph-ic">${ic("film")}</span><img data-thumb src="${localThumb(f.path)}" alt="" loading="lazy">`,
+    len: f.dur ? fmtLen(f.dur) : "", title: f.name,
+    sub: f.state === "error" ? `<em>${esc(f.err)}</em>`
+      : fmtSize(f.size) + (f.fresh ? " · changed seconds ago: if it is still downloading, wait for it to finish"
+                                   : " · already on this computer, nothing to upload"),
+    side: f.state === "up" ? `<span class="ok up">Starting</span>` : f.state === "error" ? "" : `<span class="ok">${ic("check")}Ready</span>`})).join("");
   h += A.files.map(f => rowHtml(A, {id: f.id, kind: "file", thumb: `<video src="${f.src}#t=1" muted preload="metadata" playsinline></video>`,
     len: f.dur ? fmtLen(f.dur) : "", title: f.file.name,
     sub: f.state === "error" ? `<em>${esc(f.err)}</em>` : fmtSize(f.file.size) + " · uploaded file",
-    side: f.state === "up" ? `<span class="ok up">${f.pct < 100 ? f.pct + "%" : "Starting"}</span>` : f.state === "error" ? "" : `<span class="ok">${ic("check")}Ready</span>`,
+    side: f.state === "up" ? `<span class="ok up">${f.pct < 100 ? f.pct + "%" : "Starting"}</span>`
+      : f.state === "error" ? (S.status.local_pick ? `<button type="button" class="chip" data-act="pickfolder" title="Use the file where it is instead of sending it">${ic("folder")}Use the folder instead</button>` : "")
+      : `<span class="ok">${ic("check")}Ready</span>`,
     bar: f.state === "up" ? f.pct : null})).join("");
   const n = batchUsed(A);
   if (n && !A.busy && n < batchMax())
@@ -1581,12 +1642,14 @@ function drawAtt() {
     const f = att().files.find(x => x.id === v.closest(".lp").dataset.row);
     if (f && !f.dur) { f.dur = v.duration; const th = v.parentElement; if (!th.querySelector(".du")) th.insertAdjacentHTML("beforeend", `<span class="du">${fmtLen(f.dur)}</span>`); }
   }, {once: true}));
+  // a video whose picture could not be drawn keeps the film icon behind it
+  box.querySelectorAll("img[data-thumb]").forEach(im => im.addEventListener("error", () => im.remove(), {once: true}));
   $("#att")?.classList.toggle("has", !!h);
-  const u = $("#url"); if (u) u.placeholder = A.links.length || A.files.length ? "Paste another link" : "Paste a YouTube, Twitch or Kick video link";
+  const u = $("#url"); if (u) u.placeholder = A.links.length || A.files.length || (A.locals || []).length ? "Paste another link" : "Paste a YouTube, Twitch or Kick video link";
   drawLookBar();
   const b = $("#goBtn");
   if (b) { b.disabled = A.busy;
-    const k = A.files.length + A.links.filter(l => l.state === "ok").length;
+    const k = A.files.length + (A.locals || []).length + A.links.filter(l => l.state === "ok").length;
     // Nothing chosen yet: the button says what pressing it does first (pick the framing and style, with a preview).
     // Once a look is chosen it is on the bar above, so the button goes back to starting the clips.
     const look = !S.lastPick;
@@ -1638,6 +1701,7 @@ document.addEventListener("keydown", e => { if (e.target.id === "url" && e.key =
 document.addEventListener("click", e => {
   const r = e.target.closest("[data-rm]"), A = att(); if (!r || A.busy) return;
   if (r.dataset.rm === "link") A.links = A.links.filter(l => l.id !== r.dataset.id);
+  else if (r.dataset.rm === "local") A.locals = (A.locals || []).filter(f => f.id !== r.dataset.id);
   else { const i = A.files.findIndex(f => f.id === r.dataset.id); if (i >= 0) { URL.revokeObjectURL(A.files[i].src); A.files.splice(i, 1); } }
   if (!A.links.some(l => l.state === "wait")) A.queued = false;
   drawAtt();
@@ -1734,6 +1798,8 @@ function pickDefaults(A) {
 /* The picture the previews are drawn from: the biggest video already added, either a link's own thumbnail or a
    frame of an uploaded file. Nothing is fetched from another site (the page may not do that). */
 function pickSource(A) {
+  const loc = (A.locals || []).find(x => x.state === "ready");
+  if (loc) return {kind: "img", src: localThumb(loc.path)};    // a frame the server drew from the file itself
   const f = A.files.find(x => x.file);
   if (f) return {kind: "file", file: f.file};
   const l = A.links.find(x => x.state === "ok" && x.info?.thumb);
@@ -1753,6 +1819,7 @@ function drawPickPreviews(src) {
   if (src.kind === "img") {
     const im = new Image();
     im.onload = () => paint(im);
+    im.onerror = () => canvases.forEach(c => c.getContext("2d").clearRect(0, 0, c.width, c.height));
     im.src = src.src;
     return;
   }
@@ -1842,7 +1909,7 @@ function drawPick(opts, A) {
       <span class="lay-prev ${esc(layout)}" style="height:64px"><span class="ph" style="width:36px;height:64px"><i></i></span></span>${esc(LAYOUT_SHORT[layout] || layout)}</button>`;
   const sty = k => `<button type="button" class="pd-opt" data-style="${k}" aria-pressed="${opts.style === k}" title="${esc(S.status?.styles?.[k] || LOOK_STYLES[k] || k)}">
       <span class="cap-prev" style="height:64px;font-family:${CAP_LOOK[k]?.font || "inherit"},sans-serif;font-weight:${CAP_LOOK[k]?.w || 400}">${CAP_LOOK[k]?.up === false ? "Clip <b>this</b>" : "CLIP <b>THIS</b>"}</span>${esc(S.status?.styles?.[k] || LOOK_STYLES[k] || k)}</button>`;
-  const n = A.files.length + A.links.filter(l => l.state === "ok").length;
+  const n = A.files.length + (A.locals || []).length + A.links.filter(l => l.state === "ok").length;
   dlg.innerHTML = `<form method="dialog" class="pd"><div>
       <h2>Choose the look before clipping</h2>
       <p class="pd-sub">${n === 1 ? "Pick these now, so the clips come out the way you want them the first time."
@@ -1917,6 +1984,170 @@ $("#pickdlg").addEventListener("change", e => {
 });
 $("#pickdlg").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close("cancel"); });
 
+/* ============================================================ a video that is already in a folder here
+   The folder is opened on the computer Anhy Clips runs on, the video is picked from what is in it, and clipping
+   starts from that file: nothing is uploaded, and nothing is downloaded again. Only the owner of this computer (or
+   the admin of a server) is offered this, and only the folders listed here are ever looked into. */
+const LB = {open: false, busy: false, err: "", path: "", parent: "", roots: [], folders: [], videos: [],
+            picked: new Map(), window: false, cut: false};
+const lbDate = t => new Date(t * 1000).toLocaleDateString(undefined, {day: "numeric", month: "short"});
+const samePath = (a, b) => String(a || "").replace(/[\\/]+$/, "").toLowerCase() === String(b || "").replace(/[\\/]+$/, "").toLowerCase();
+const lbRoom = () => Math.max(0, batchMax() - batchUsed(att()) - LB.picked.size);
+
+function lbShell() {
+  $("#localdlg").innerHTML = `<form method="dialog" class="pd">
+    <div><h2>Clip a video that is already on this computer</h2>
+      <p class="pd-sub">Open the folder the video was downloaded to and pick it from there. Nothing is uploaded and
+        nothing is downloaded again: clipping starts on the file itself.</p></div>
+    <div class="lb-bar">
+      <button type="button" class="chip" id="lb_up" data-lb="up" title="Up one folder">${ic("caret").replace("<svg", '<svg style="transform:rotate(90deg)"')}Up</button>
+      <input class="lb-path" id="lb_path" placeholder="Or type a folder, for example D:\\Videos" aria-label="Folder to look in" autocomplete="off" spellcheck="false">
+      <button type="button" class="chip" id="lb_go" data-lb="go">${ic("arrowr")}Open</button>
+      <button type="button" class="chip" id="lb_window" data-lb="window" hidden>${ic("folder")}Choose a folder…</button>
+    </div>
+    <p class="lb-where" id="lb_where"></p>
+    <div class="lb-list" id="lb_list"></div>
+    <div class="lb-foot"><span class="hint" id="lb_hint"></span><span class="grow"></span>
+      <button type="button" class="btn" id="lb_save" data-lb="save" hidden></button>
+      <button type="button" class="btn primary" id="lb_add" data-lb="add" disabled>Add these videos</button>
+      <button class="btn" value="cancel">Close</button></div></form>`;
+}
+
+function lbList() {
+  const list = $("#lb_list"); if (!list) return;
+  if (LB.busy) return void (list.innerHTML = `<div class="lb-empty">Looking…</div>`);
+  if (LB.err) return void (list.innerHTML = `<div class="lb-empty">${ic("warn")}${esc(LB.err)}</div>`);
+  const folder = x => `<button type="button" class="lb-row" data-lb="open" data-p="${esc(x.path)}">
+      <i>${ic("folder")}</i><span class="nm">${esc(x.name)}</span><span class="sz">${esc(x.hint || "")}</span></button>`;
+  if (!LB.path) {
+    if (!LB.roots.length) return void (list.innerHTML = `<div class="lb-empty">${ic("folder")}No folders are listed yet.
+      Type the folder's path above, for example <b>D:\\Videos</b>, and press Open.</div>`);
+    return void (list.innerHTML = `<div class="lb-sec">Folders on this computer</div>` + LB.roots.map(r =>
+      folder({name: r.name + (r.saved ? "  ·  kept" : ""), path: r.path, hint: r.there ? r.path : "not there right now"})).join(""));
+  }
+  let h = "";
+  if (LB.folders.length) h += `<div class="lb-sec">Folders</div>` + LB.folders.map(folder).join("");
+  if (LB.videos.length) h += `<div class="lb-sec">Videos${LB.cut ? " · the first 500" : ""}</div>` + LB.videos.map(v => {
+    const on = LB.picked.has(v.path);
+    return `<button type="button" class="lb-row" data-lb="pick" data-p="${esc(v.path)}" aria-pressed="${on}" title="${esc(v.path)}">
+      <i>${ic(on ? "check" : "film")}</i><span class="nm">${esc(v.name)}</span><span class="sz">${fmtSize(v.size)} · ${lbDate(v.mtime)}</span></button>`;
+  }).join("");
+  list.innerHTML = h || `<div class="lb-empty">${ic("film")}No videos in this folder.
+    Only video files are listed (mp4, mov, mkv, webm, avi, mpg, ts, flv), and a download still in progress isn't one yet.</div>`;
+}
+
+function lbDraw() {
+  const dlg = $("#localdlg"); if (!dlg || !LB.open) return;
+  lbList();
+  const box = $("#lb_path"); if (box && document.activeElement !== box) box.value = LB.path;
+  const where = $("#lb_where"); if (where) where.innerHTML = LB.path ? `Looking in <b>${esc(LB.path)}</b>` : "Choose a folder to look in.";
+  const up = $("#lb_up"); if (up) up.disabled = !LB.path || LB.busy;
+  const win = $("#lb_window"); if (win) win.hidden = !LB.window;
+  const save = $("#lb_save");
+  if (save) {
+    const kept = LB.path && LB.roots.some(r => r.saved && samePath(r.path, LB.path));
+    save.hidden = !LB.path;
+    save.dataset.lb = kept ? "unsave" : "save";
+    save.textContent = kept ? "Remove this folder from the list" : "Keep this folder in the list";
+  }
+  const n = LB.picked.size, room = lbRoom();
+  const hint = $("#lb_hint");
+  if (hint) hint.textContent = n ? `${n} chosen · room for ${room} more in this batch`
+    : "The file is used where it is: no upload, no second copy, no download.";
+  const add = $("#lb_add");
+  if (add) { add.disabled = !n || LB.busy; add.innerHTML = `${ic("plus")}${n ? `Add ${n} video${n === 1 ? "" : "s"}` : "Add these videos"}`; }
+}
+
+async function lbOpen(path) {
+  LB.busy = true; LB.err = ""; lbDraw();
+  try {
+    const d = await api("/api/local/browse?path=" + encodeURIComponent(path || ""));
+    Object.assign(LB, {path: d.path, parent: d.parent, folders: d.folders || [], videos: d.videos || [], cut: !!d.cut});
+    if (d.roots) LB.roots = d.roots;
+    if (d.chosen) {                                  // a whole path to a video was pasted: that one is ticked already
+      const v = LB.videos.find(x => x.name === d.chosen);
+      if (v) LB.picked.set(v.path, v);
+    }
+  } catch (e) { LB.err = e.message; }
+  LB.busy = false; lbDraw();
+}
+
+function lbPick(path) {
+  const v = LB.videos.find(x => x.path === path); if (!v) return;
+  if (LB.picked.has(path)) LB.picked.delete(path);
+  else {
+    if (lbRoom() <= 0) return toast(`You can send up to ${batchMax()} videos at a time. Add these, then come back for more.`, "bad");
+    LB.picked.set(path, v);
+  }
+  lbDraw();
+}
+
+/* Ticking a video says where it is; adding it asks how long it is and whether it can be read at all, so a file
+   that is still downloading, or one with no sound track, is refused here rather than after the wait. */
+async function lbAdd() {
+  const rows = [...LB.picked.values()];
+  if (!rows.length || LB.busy) return;
+  LB.busy = true; lbDraw();
+  const got = [];
+  for (const v of rows) {
+    try { got.push(await api("/api/local/info?path=" + encodeURIComponent(v.path))); }
+    catch (e) { got.push({...v, problem: e.message}); }
+  }
+  LB.busy = false;
+  const bad = got.filter(x => x.problem);
+  if (bad.length) toast(bad.length === 1 ? `${bad[0].name}: ${bad[0].problem}`
+                                         : `${bad.length} of those can't be used. ${bad[0].problem}`, "bad");
+  if (got.some(x => !x.problem && x.fresh))
+    toast("One of those was written to seconds ago. If it is still downloading, wait for it to finish and add it again.", "bad");
+  $("#localdlg").close("go");
+  if (got.some(x => !x.problem)) attachLocal(got.filter(x => !x.problem));
+}
+
+async function openLocal() {
+  const dlg = $("#localdlg"); if (!dlg || LB.open) return;
+  Object.assign(LB, {open: true, busy: false, err: "", path: "", parent: "", folders: [], videos: [], picked: new Map()});
+  lbShell();
+  dlg.onclose = () => { LB.open = false; dlg.innerHTML = ""; };
+  dlg.returnValue = "cancel";
+  dlg.showModal();
+  lbDraw();
+  try { LB.window = !!(await api("/api/local")).folder_window; } catch (e) { LB.err = e.message; }
+  await lbOpen("");
+}
+
+$("#localdlg").addEventListener("click", async e => {
+  if (e.target === e.currentTarget) return e.currentTarget.close("cancel");
+  const b = e.target.closest("[data-lb]"); if (!b || b.disabled || LB.busy && b.dataset.lb !== "add") return;
+  const a = b.dataset.lb;
+  if (a === "open") return lbOpen(b.dataset.p);
+  if (a === "pick") return lbPick(b.dataset.p);
+  if (a === "up") return lbOpen(LB.parent || "");
+  if (a === "go") return lbOpen($("#lb_path").value.trim());
+  if (a === "add") return lbAdd();
+  if (a === "window") {
+    b.disabled = true; lbDraw();
+    try {
+      const r = await api("/api/local/pick", {method: "POST"});
+      if (r.path) await lbOpen(r.path);
+    } catch (err) { toast(err.message, "bad"); }
+    const back = $("#lb_window"); if (back) back.disabled = false;
+    return lbDraw();
+  }
+  if (a === "save" || a === "unsave") {
+    try {
+      const r = a === "save" ? await send("/api/local/folders", {path: LB.path})
+        : await api("/api/local/folders", {method: "DELETE", headers: {"Content-Type": "application/json"}, body: JSON.stringify({path: LB.path})});
+      LB.roots = r.roots || LB.roots;
+      toast(a === "save" ? "That folder is in the list now, so its videos are one press away."
+                         : "Taken out of the list. Nothing inside it was touched.", "ok");
+    } catch (err) { toast(err.message, "bad"); }
+    return lbDraw();
+  }
+});
+$("#localdlg").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "lb_path") { e.preventDefault(); lbOpen(e.target.value.trim()); }
+});
+
 async function makeClips() {
   const A = att();
   if (A.busy) return;
@@ -1949,6 +2180,12 @@ async function makeClips() {
     catch (e) { l.state = "bad"; l.msg = e.message; failed++; }
     l.sending = false; drawAtt();
   }
+  for (const f of A.locals || []) {                  // nothing to send: the server takes the file where it is
+    f.state = "up"; drawAtt();
+    try { await send("/api/jobs/local", {path: f.path, options: opts, creator: who}); f.state = "done"; started++; }
+    catch (e) { f.state = "error"; f.err = e.message; failed++; }
+    drawAtt();
+  }
   for (const f of A.files) {
     f.state = "up"; f.pct = 0; drawAtt();
     try { await sendFile(f, who, opts); f.state = "done"; started++; }
@@ -1956,6 +2193,7 @@ async function makeClips() {
     drawAtt();
   }
   A.links = A.links.filter(l => l.state !== "done");
+  A.locals = (A.locals || []).filter(f => f.state !== "done");
   A.files = A.files.filter(f => { if (f.state === "done") { URL.revokeObjectURL(f.src); return false; } return true; });
   A.busy = false; drawAtt();
   if (started) {
@@ -2029,7 +2267,10 @@ function jobHtml(j) {
   if (j.status === "live") return liveHtml(j);
   const busy = j.status === "queued" || j.status === "running";
   const who = !creatorId() && j.creator ? S.creators.find(c => c.id === j.creator)?.name : "";
-  const meta = [who, j.uploader, j.duration ? fmt(j.duration) + " long" : "", j.clips.length ? j.clips.length + (j.clips.length === 1 ? " clip" : " clips") : "",
+  const meta = [who, j.uploader, j.duration ? fmt(j.duration) + " long" : "",
+                j.source?.local ? (j.source.linked === false ? `taken from ${j.source.from || "your folder"} and used where it is`
+                                                             : `taken from ${j.source.from || "your folder"}`) : "",
+                j.clips.length ? j.clips.length + (j.clips.length === 1 ? " clip" : " clips") : "",
                 j.took ? "made in " + fmt(j.took) : "", j.kind === "live" ? "recording, " + j.stage.toLowerCase() : ""].filter(Boolean).map(esc).join(" · ");
   const pic = j.thumb ? `<img src="/media/${esc(j.id)}/thumb.jpg" alt="" loading="lazy">` : ic(j.source?.type === "file" ? "film" : "link");
   return `<div class="job-head"><div class="jt"><span class="jthumb">${pic}${j.duration ? `<span class="du">${fmt(j.duration)}</span>` : ""}</span><div style="min-width:0"><h3>${esc(j.title || j.source.name)}</h3><p class="sub">${meta}</p></div></div>
@@ -2642,6 +2883,7 @@ document.addEventListener("click", async e => {
     }
     if (a === "tab") return setTab(d.t);
     if (a === "pickfile") return $("#file").click();
+    if (a === "pickfolder") return openLocal();
     if (a === "addmore") { const u = $("#url"); return u && !u.value ? (u.focus(), toast("Paste another link, or drop a file anywhere on the box.")) : $("#file").click(); }
     if (a === "closedlg") return $("#clipdlg").close();
     if (a === "openclip") return openClip(d.j, d.c);

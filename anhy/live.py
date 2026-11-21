@@ -68,13 +68,13 @@ def resolve(url: str) -> dict:
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "logger": _Quiet(),
             "format": "b[height<=720]/bv*[height<=720]+ba/b"}
     if media.is_youtube(url) and media.youtube_paused():
-        raise NotLive(media.YT_BLOCKED)
+        raise NotLive(media.YT_BLOCKED_LIVE)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as e:  # noqa: BLE001
         if media.note_refusal(url, e):
-            raise NotLive(media.YT_BLOCKED) from e
+            raise NotLive(media.YT_BLOCKED_LIVE) from e
         raise NotLive(str(e)[-200:]) from e
     if not info or not info.get("is_live"):
         raise NotLive("This channel is not live right now.")
@@ -785,9 +785,7 @@ def start_session(creator: dict, url=None) -> dict:
     if not media.site_allowed(url):
         raise ValueError("Channel links must be from YouTube, Twitch or Kick.")
     if media.is_youtube(url) and media.youtube_paused():
-        raise ValueError(media.YT_BLOCKED.replace("download videos", "record YouTube streams")
-                         .replace("Upload the video file instead, or use a Twitch or Kick link. YouTube links",
-                                  "Twitch and Kick streams still work. YouTube"))
+        raise ValueError(media.YT_BLOCKED_LIVE)
     if len(active_mine()) >= config.MAX_LIVE_PER_USER:
         raise ValueError(f"You're already recording {len(active_mine())} streams, the most this server allows at once. Stop one first.")
     if len(active()) >= config.MAX_LIVE_TOTAL or (active() and load.busy()):

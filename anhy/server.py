@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 from . import admin as admins
 from . import account, load
-from . import (accounts, ai, alerts, auth, config, creators, ctx, db, jobs, live, media, posting,
+from . import (accounts, ai, alerts, auth, config, creators, ctx, db, jobs, live, local, media, posting,
                profiles, render, safe, transcribe, usage)
 
 from . import tools as _tools  # noqa: E402
@@ -39,7 +39,7 @@ WEB = config.ROOT / "web"
 OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
 PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
          "/privacy": "legal.html", "/terms": "legal.html", "/acceptable-use": "legal.html"}
-VIDEO_TYPES = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".ts", ".flv"}
+VIDEO_TYPES = media.VIDEO_EXTS
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; "
        "frame-src https://player.twitch.tv https://www.youtube-nocookie.com https://player.kick.com; "
@@ -63,6 +63,7 @@ def _startup():
             f.unlink()
         except OSError:
             pass
+    local.sweep()                    # pictures drawn from videos in the picker, older than a week
     render.install_fonts()
     if _tools.missing():
         print("\n  " + _tools.HELP + "\n", flush=True)
@@ -220,7 +221,7 @@ class Compress:
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "") if scope["type"] == "http" else ""
-        media = path.startswith(("/media/", "/api/upload")) or path.endswith((".mp4", ".jpg", ".png", ".webp", ".ico"))
+        media = path.startswith(("/media/", "/api/upload", "/api/local/thumb")) or path.endswith((".mp4", ".jpg", ".png", ".webp", ".ico"))
         await (self.plain if scope["type"] != "http" or media else self.gzip)(scope, receive, send)
 
 
@@ -578,6 +579,7 @@ def status(request: Request):
     return {"user": auth.public(me_), "update": updates.latest() if me_.is_admin else None, "accounts": config.ACCOUNTS, "disk_full": load.disk_full(), "no_ffmpeg": bool(_tools.missing()), "links": {"repo": config.REPO_URL, "follow": config.FOLLOW_URL}, "ai": usage.brief(), "unread": notices.unread(),
             "tour": not accounts.settings()["tour_done"],
             "youtube": accounts.youtube_ready(), "connect": {p: accounts.can_connect(p) for p in accounts.PLATFORM_NAMES}, "max_upload_mb": config.MAX_UPLOAD_MB, "upload_part_mb": config.UPLOAD_PART_MB, "max_batch": config.MAX_ACTIVE_JOBS_PER_USER,
+            "local_pick": local.enabled(me_), "video_kinds": sorted(media.VIDEO_EXTS),
             "styles": {k: v["label"] for k, v in render.STYLES.items()}, "layouts": render.LAYOUTS}
 
 
@@ -744,7 +746,7 @@ def create_from_file(file: UploadFile = File(...), options: str = Form("{}"), cr
     name = re.sub(r"[^\w.\- ]", "_", Path(file.filename or "video.mp4").name)[:120]
     ext = Path(name).suffix.lower()
     if ext not in VIDEO_TYPES:
-        raise HTTPException(400, "Upload a video file (mp4, mov, mkv or webm).")
+        raise HTTPException(400, "Upload a video file: mp4, mov, mkv, webm, avi, mpg, ts or flv.")
     if creator and not creators.get(creator):
         raise HTTPException(404, "No such creator")
     try:
@@ -825,7 +827,7 @@ def upload_start(body: dict = Body(...)):
     name = re.sub(r"[^\w.\- ]", "_", Path(str(body.get("name") or "video.mp4")).name)[:120]
     ext = Path(name).suffix.lower()
     if ext not in VIDEO_TYPES:
-        raise HTTPException(400, "Upload a video file (mp4, mov, mkv or webm).")
+        raise HTTPException(400, "Upload a video file: mp4, mov, mkv, webm, avi, mpg, ts or flv.")
     size = body.get("size")
     if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
         raise HTTPException(400, "Bad file size.")
@@ -926,6 +928,150 @@ def upload_cancel(upid: str):
     _up_get(upid)
     shutil.rmtree(_up_root() / f"up-{upid}", ignore_errors=True)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- videos already on this computer
+# A video that has been downloaded into a folder does not have to be sent through the browser, and it does not have
+# to be fetched again: the folder is opened here, the video is picked from what is in it, and clipping starts from
+# the file itself. Only the owner of this computer (or the admin of a server) may look through its folders.
+_thumbs = threading.Semaphore(3)          # pictures of picked videos: a few at a time, never a crowd of ffmpeg runs
+
+
+def _local_ok(request: Request):
+    """May this person look through the computer's folders? Anyone else gets the same "not found" as for anything
+    else that isn't theirs, so the folders are not even known to exist."""
+    if not local.enabled(_me(request)):
+        raise HTTPException(404, "Not Found")
+
+
+@app.get("/api/local")
+def local_start(request: Request):
+    _local_ok(request)
+    return {"roots": local.roots(), "folder_window": _on_this_computer(request), "kinds": sorted(local.VIDEO_EXTS)}
+
+
+@app.get("/api/local/browse")
+def local_browse(request: Request, path: str = ""):
+    _local_ok(request)
+    _throttle("localbrowse:" + ctx.uid(), 240, 60, "That's a lot of folders at once. Wait a moment.")
+    try:
+        return local.browse(path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/local/folders")
+def local_folder_add(request: Request, body: dict = Body(...)):
+    _local_ok(request)
+    _throttle("localfolders:" + ctx.uid(), 40, 600)
+    try:
+        return local.add_folder(str(body.get("path") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/local/folders")
+def local_folder_remove(request: Request, body: dict = Body(...)):
+    _local_ok(request)
+    try:
+        return local.remove_folder(str(body.get("path") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/local/pick")
+def local_folder_window(request: Request):
+    """The computer's own "choose a folder" window. It can only be shown to whoever is sitting at that computer."""
+    _local_ok(request)
+    if not _on_this_computer(request):
+        raise HTTPException(400, "Type the folder's path instead: a folder window can only be shown on the computer "
+                                 "Anhy Clips runs on.")
+    _throttle("localpick:" + ctx.uid(), 20, 600)
+    return {"path": local.pick_window()}
+
+
+@app.get("/api/local/info")
+def local_info(request: Request, path: str = ""):
+    _local_ok(request)
+    _throttle("localinfo:" + ctx.uid(), 240, 60, "Wait a moment: that's a lot of files at once.")
+    try:
+        return local.info(path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/local/thumb")
+def local_thumb(request: Request, path: str = ""):
+    """A small picture of a picked video, drawn once from the file itself and kept for later."""
+    _local_ok(request)
+    _throttle("localthumb:" + ctx.uid(), 300, 60, "Wait a moment for those pictures.")
+    got = None
+    try:
+        with _thumbs:
+            got = local.thumb_file(path)
+    except ValueError:
+        got = None
+    if not got:
+        raise HTTPException(404, "No picture could be made from that video.")
+    return FileResponse(got, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.post("/api/jobs/local")
+def create_from_local(request: Request, body: dict = Body(...)):
+    """Start clipping a video that is already in a folder here: nothing is downloaded, and nothing is uploaded."""
+    _local_ok(request)
+    _need_verified()
+    _quota()
+    _throttle("newjob:" + ctx.uid(), 30, 600)
+    path = str(body.get("path") or "")
+    creator = str(body.get("creator") or "") or None
+    if creator and not creators.get(creator):
+        raise HTTPException(404, "No such creator")
+    opts = body.get("options") if isinstance(body.get("options"), dict) else {}
+    try:
+        jobs.clean_options(opts)               # refused now, before the file is looked at
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Those options aren't valid.")
+    if _tools.missing():
+        raise HTTPException(503, _tools.HELP)
+    try:
+        got = local.info(path)                 # it is there, it is a video, and this is how long it is
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if got["problem"]:
+        raise HTTPException(422, f"Anhy Clips can't read that video yet: {got['problem']}")
+    if _disk.get(ctx.uid(), (0, 0))[1] + got["size"] > config.MAX_USER_GB * 1e9:
+        raise HTTPException(507, "There isn't room for this video in your storage. Delete some older videos to make room.")
+    if (got["duration"] or 0) > config.MAX_VIDEO_HOURS * 3600:
+        raise HTTPException(413, f"That video is longer than {config.MAX_VIDEO_HOURS:g} hours, which is the limit. "
+                                 "Choose a shorter part of it under Options.")
+    job = None
+    try:
+        with _create_lock:
+            _job_slots()
+            job = jobs.create({"type": "file", "path": "", "name": got["name"], "local": True,
+                               "from": Path(got["path"]).parent.name}, opts, enqueue=False, creator=creator)
+            src, linked = local.take(path, jobs.job_dir(job["id"]))
+            job["source"]["path"], job["source"]["linked"] = str(src), linked
+            job["duration"] = got["duration"]
+            pic = local.thumb_file(path)       # the picture the picker already drew: the video shows it at once
+            if pic:
+                out = jobs.job_dir(job["id"]) / "clips" / "thumb.jpg"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(pic, out)
+                job["thumb"] = True
+            jobs.save(job)
+    except (ValueError, TypeError) as e:
+        if job:
+            jobs.delete(job["id"])
+        raise HTTPException(400, str(e) if isinstance(e, ValueError) else "Those options aren't valid.")
+    except OSError:
+        if job:
+            jobs.delete(job["id"])
+        raise HTTPException(507, "There wasn't room to take that video in. Delete some older videos and try again.")
+    _disk.pop(ctx.uid(), None)
+    jobs.enqueue(job)
+    return jobs.public(job)
 
 
 @app.post("/api/jobs/{jid}/clips/{cid}/render")
