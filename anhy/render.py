@@ -1,4 +1,5 @@
 """Turns a time range into a vertical clip: 9:16 layout, bouncy word captions, hook title, cover."""
+import math
 import re
 import shutil
 import subprocess
@@ -260,6 +261,42 @@ def _hook_y(layout, hook_y, facecam=None):
     return hook_y
 
 
+def edit_points(clip: dict, words: list) -> list[float]:
+    """Plan at most two short accents, anchored to spoken moments rather than arbitrary timestamps.
+
+    An AI beat must be near a real transcript word. Highlight words are the fallback when an older
+    model doesn't return beats. Never emphasize the first/last second or two moments too close together.
+    Times returned here are relative to the start of this clip, ready for ffmpeg's trimmed input.
+    """
+    if not clip.get("auto_edit", True):
+        return []
+    start, end = float(clip["start"]), float(clip["end"])
+    if end - start < 5:
+        return []
+    spoken = sorted((w for w in words if start + 0.8 <= w["s"] <= end - 0.8), key=lambda w: w["s"])
+    if not spoken:
+        return []
+    candidates = []
+    for value in (clip.get("edit_beats") or [])[:8]:
+        try:
+            t = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(t) and start + 0.8 <= t <= end - 0.8:
+            nearest = min(spoken, key=lambda w: abs(w["s"] - t))
+            if abs(nearest["s"] - t) <= 0.9:
+                candidates.append(nearest["s"])
+    strong = {_key(w) for w in clip.get("highlight_words", []) if isinstance(w, str)}
+    candidates += [w["s"] for w in spoken if _key(w["w"]) in strong]
+    picked = []
+    for t in candidates:
+        if all(abs(t - prev) >= 3 for prev in picked):
+            picked.append(t)
+        if len(picked) == 2:
+            break
+    return [round(t - start, 2) for t in sorted(picked)]
+
+
 _qsv_ok = None
 RENDER_SECONDS = 600      # one clip's video encode; far beyond normal, so a frozen encoder is stopped, not waited on
 
@@ -279,23 +316,58 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
     # open files whose full path is longer than 260 characters on Windows, which a data folder deep inside other
     # folders easily reaches. Inside the work folder every name is short and relative (a drive colon would also
     # break the filter syntax).
+    beats = edit_points(clip, words)
     work = Path(tempfile.mkdtemp(prefix="pk"))
     try:
-        return _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face)
+        result = _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face,
+                            beats=beats, sound_fx=clip.get("sound_fx", True))
+        return {**result, "edit_points": beats}
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str, face=None) -> dict:
+def _edit_video(beats: list[float]) -> str:
+    """A smooth, small punch-in and contrast lift around each actual spoken beat. No flashes or cuts."""
+    if not beats:
+        return "[v0]null[v1];"
+    pulse = "+".join(f"max(0,1-abs(t-{t:.2f})/0.52)" for t in beats)
+    zoom = f"1+0.11*({pulse})"
+    lift = f"1+0.04*({pulse})"
+    return (f"[v0]scale=w='iw*({zoom})':h='ih*({zoom})':eval=frame,"
+            f"crop={W}:{H}:(in_w-out_w)/2:(in_h-out_h)/2,"
+            f"eq=contrast='{lift}':saturation='{lift}':eval=frame[v1];")
+
+
+def _edit_audio(beats: list[float]) -> str:
+    """Generated band-limited noise, mixed very quietly so it never replaces speech or needs stock audio."""
+    parts = ["[0:a:0]aresample=48000[voice];"]
+    for i, t in enumerate(beats):
+        delay = round(t * 1000)
+        parts.append(f"anoisesrc=c=pink:r=48000:d=0.16,highpass=f=700,lowpass=f=3200,"
+                     f"afade=t=in:st=0:d=0.02,afade=t=out:st=0.08:d=0.08,"
+                     f"volume=0.025,adelay={delay}:all=1[sfx{i}];")
+    inputs = "[voice]" + "".join(f"[sfx{i}]" for i in range(len(beats)))
+    parts.append(f"{inputs}amix=inputs={len(beats) + 1}:duration=first:normalize=0,"
+                 "loudnorm=I=-14:TP=-1.5:LRA=11[a]")
+    return "".join(parts)
+
+
+def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str,
+               face=None, beats=None, sound_fx=True) -> dict:
     global _qsv_ok
     (work / f"{name}.ass").write_text(ass, encoding="utf-8")
     (work / "f").mkdir()
     for f in config.FONTS_DIR.glob("*.ttf"):
         shutil.copyfile(f, work / "f" / f.name)
-    fc = _filter(layout, fg_h, face) + f"[v0]ass={name}.ass:fontsdir=f[v]"
+    beats = beats or []
+    fc = _filter(layout, fg_h, face) + _edit_video(beats) + f"[v1]ass={name}.ass:fontsdir=f[v]"
+    if sound_fx and beats:
+        fc += ";" + _edit_audio(beats)
     base = ["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src),
-            "-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-            "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-pix_fmt"]
+            "-filter_complex", fc, "-map", "[v]", "-map", "[a]" if sound_fx and beats else "0:a:0"]
+    if not (sound_fx and beats):
+        base += ["-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
+    base += ["-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-pix_fmt"]
     encoders = []
     if _qsv_ok is not False:
         encoders.append(("qsv", ["nv12", "-c:v", "h264_qsv", "-global_quality", "23", "-preset", "fast"]))

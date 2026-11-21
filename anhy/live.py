@@ -572,7 +572,9 @@ class Session:
     def _add_clip(self, c):
         self.n += 1
         c.update(id=f"clip{self.n:03d}", style=self.settings["style"], layout=self.settings["layout"],
-                 captions=self.job["options"].get("captions", True), status="queued", version=0, made_at=time.time())
+                 captions=self.job["options"].get("captions", True),
+                 auto_edit=self.job["options"].get("auto_edit", True), sound_fx=self.job["options"].get("sound_fx", True),
+                 status="queued", version=0, made_at=time.time())
         with self.lock:
             self.job["clips"].append(c)
         jobs.save(self.job)

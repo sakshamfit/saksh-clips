@@ -1,0 +1,72 @@
+/* Doodle Crew Footer adapted from sakshamfit/orion-gkp for Anhy Clips.
+   Everything is scoped to the footer so the signed-in app remains unchanged. */
+.orion-doodle-footer {
+  --footer-bg:#f4f3ef;--footer-ink:#303731;--footer-muted:#647067;--footer-line:#d8ddd5;
+  --footer-accent:#a3524a;--footer-bubble:#fff;--footer-solid:#303731;--footer-solid-ink:#fff;
+  background:var(--footer-bg);color:var(--footer-ink);padding:64px clamp(20px,6vw,90px) 24px;
+  overflow:hidden;font:14px/1.5 "Geist",system-ui,sans-serif;
+}
+[data-theme="dark"] .orion-doodle-footer {
+  --footer-bg:#181d1a;--footer-ink:#f2f1ea;--footer-muted:#c3cbc2;--footer-line:#495349;
+  --footer-accent:#f3a8a1;--footer-bubble:#303a32;--footer-solid:#f2f1ea;--footer-solid-ink:#181d1a;
+}
+.orion-doodle-footer * {box-sizing:border-box}
+.orion-footer-top {max-width:1280px;margin:auto;display:grid;grid-template-columns:1fr 1.25fr;gap:56px}
+.orion-footer-brand {display:flex;align-items:center;min-height:44px}
+.orion-footer-logo {display:block;width:150px;max-height:50px;object-fit:contain;object-position:left center}
+[data-theme="dark"] .orion-footer-logo {filter:invert(1)}
+.orion-footer-top p {max-width:300px;margin:12px 0 0;color:var(--footer-muted);font-size:14px;line-height:1.7}
+.orion-footer-columns {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.orion-footer-columns h3 {margin:8px 0 18px;color:var(--footer-ink);font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+.orion-footer-columns a {display:block;width:fit-content;margin:0 0 11px;color:var(--footer-muted);font-size:13px;text-decoration:none;transition:color .2s ease}
+.orion-footer-columns a:hover,.orion-footer-bottom a:hover {color:var(--footer-accent)}
+.orion-doodle-stage {position:relative;max-width:1020px;margin:100px auto 0;padding-top:70px}
+.orion-word {display:flex;justify-content:center;padding-right:.08em;color:var(--footer-ink);font-size:clamp(110px,23vw,285px);font-weight:800;letter-spacing:-.09em;line-height:.82}
+.orion-word span {display:block;transform-origin:center bottom}
+.orion-doodle-footer.is-visible .orion-word span {animation:orion-stamp .7s both cubic-bezier(.2,.8,.25,1.15)}
+.orion-ground {height:2px;margin-top:8px;background:var(--footer-ink);border-radius:50%}
+.orion-friend {position:absolute;z-index:2;width:clamp(58px,9vw,105px);animation:orion-bob 3.5s ease-in-out infinite}
+.orion-friend button {display:block;width:100%;border:0;padding:0;background:none;cursor:pointer}
+.orion-friend svg {display:block;width:100%;height:auto;fill:var(--footer-bg);stroke:var(--footer-ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.orion-friend svg circle {fill:var(--footer-ink)}
+.orion-friend svg path[fill="#e9a274"] {fill:var(--footer-accent)}
+.friend-cat {bottom:4px;left:3%}.friend-bird {top:0;left:35%;animation-delay:-1s}.friend-ghost {top:7px;right:15%;animation-delay:-2s}
+.orion-bubble {position:absolute;bottom:100%;left:50%;transform:translateX(-50%);max-width:min(220px,65vw);white-space:nowrap;padding:8px 12px;border:1px solid var(--footer-ink);border-radius:12px;background:var(--footer-bubble);color:var(--footer-ink);font-size:12px;font-weight:600}
+.friend-cat .orion-bubble {left:0;transform:none}
+.friend-ghost .orion-bubble {left:auto;right:0;transform:none}
+.orion-doodle {position:absolute;color:var(--footer-accent);font-size:35px;animation:orion-float 4s ease-in-out infinite}
+.doodle-one {top:0;left:9%}.doodle-two {top:20px;right:5%;animation-delay:-1s}.doodle-three {bottom:15px;right:1%;animation-delay:-2s}
+.orion-footer-cta {padding:32px 0 54px;text-align:center}
+.orion-footer-cta p {margin:0 0 18px;color:var(--footer-ink);font:italic clamp(21px,3vw,28px) Georgia,serif}
+.orion-footer-cta>div {display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.orion-pill {display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 20px;border:1px solid var(--footer-ink);border-radius:30px;color:var(--footer-ink);font-size:12px;font-weight:700;text-decoration:none;transition:background-color .2s,color .2s}
+.orion-pill.solid,.orion-pill:hover {background:var(--footer-solid);color:var(--footer-solid-ink)}
+.orion-pill.solid:hover {background:transparent;color:var(--footer-ink)}
+.orion-footer-bottom {display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;max-width:1280px;margin:auto;padding-top:22px;border-top:1px solid var(--footer-line);color:var(--footer-muted);font-size:12px}
+.orion-footer-bottom>div {display:flex;align-items:center;gap:12px}
+.orion-footer-bottom a {color:var(--footer-muted);text-decoration:none;transition:color .2s}
+.footer-social-icon {display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--footer-line);border-radius:50%}
+.footer-social-icon:hover {background:var(--footer-solid);color:var(--footer-solid-ink)!important}
+.footer-social-icon svg {width:18px;height:18px;fill:none;stroke:currentColor}
+.footer-social-text {position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.orion-doodle-footer :focus-visible {outline:2px solid var(--footer-accent);outline-offset:4px}
+@keyframes orion-stamp {from {opacity:0;transform:translateY(-25px) rotate(-3deg)}to {opacity:1;transform:none}}
+@keyframes orion-bob {50% {transform:translateY(-5px)}}
+@keyframes orion-float {50% {transform:translateY(9px) rotate(10deg)}}
+@media(max-width:700px) {
+  .orion-doodle-footer {padding:52px 22px 22px}
+  .orion-footer-top {grid-template-columns:1fr;gap:30px}
+  .orion-footer-columns {gap:10px}
+  .orion-doodle-stage {margin-top:70px;padding-top:45px}
+  .orion-word {font-size:25vw}
+  .friend-bird {top:-5px}.friend-ghost {top:0}
+  .orion-footer-bottom {flex-direction:column;align-items:flex-start}
+}
+@media(max-width:420px) {
+  .orion-footer-columns {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .orion-friend {width:50px}
+  .orion-bubble {font-size:10px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .orion-doodle-footer *, .orion-doodle-footer *:before,.orion-doodle-footer *:after {animation:none!important;transition:none!important}
+}

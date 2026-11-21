@@ -1,0 +1,21 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "npm run build:css && npm run build:js && npm run check",
+    "build:css": "tailwindcss -c tailwind.config.js -i particle/input.css -o particle-title.css --minify",
+    "build:js": "esbuild particle/mount.tsx --bundle --minify --format=iife --target=es2020 --outfile=particle-title.js",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "^1.77.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -132,6 +132,31 @@ with ctx.as_user(u1.id):
 with ctx.as_user(u2.id):
     check("another user sees none of it", usage.summary({})["calls_total"] == 0)
 
+# A person's optional clipping preferences reach the scout, but cannot replace its safety rules.
+from anhy import jobs  # noqa: E402
+check("special instructions are cleaned and bounded", jobs.clean_options({"instructions": "  Funny   reactions\nno spoilers  "})["instructions"] == "Funny reactions no spoilers")
+try:
+    jobs.clean_options({"instructions": "a" * 501})
+    check("oversized instructions are refused", False)
+except ValueError:
+    check("oversized instructions are refused", True)
+with ctx.as_user(u1.id):
+    seen.clear()
+    brain.find_clips(words, np.zeros(60), 60.0, title="T", uploader="U", instructions="Find the funny reactions")
+    prompt = seen[0][1]["contents"][0]["parts"][0]["text"]
+    check("the scout sees the viewer preference and keeps the clip rules", "Find the funny reactions" in prompt and "Never put links" in prompt)
+    check("the scout asks for a grounded social caption and searchable tags", "ready-to-post social caption" in prompt and "searchable tags" in prompt)
+
+# Tags are useful only when relevant and valid, not when they are generic reach-bait.
+meta = brain._tidy({"category": "clutch", "title": "The final round", "description": "That last play. #GTA6 #FYP",
+                   "hashtags": ["#GTA6", "gta6", "FYP", "https://bad.example", "Clutch", "#Gaming"]}, 2, 20, game="gta 6")
+check("social caption has no duplicate embedded hashtags", "#" not in meta["description"] and "That last play" in meta["description"])
+check("tags are unique, limited and contain the game", len(meta["hashtags"]) <= 5 and meta["hashtags"].count("GTA6") == 1)
+check("spam and broken link tags are rejected", "FYP" not in meta["hashtags"] and all("http" not in t for t in meta["hashtags"]))
+check("AI can leave a title as an honest caption fallback", brain._tidy({"title": "A real moment", "hashtags": []}, 0, 10)["description"] == "A real moment")
+check("a clip still gets clean tags when AI is unavailable", len(brain._tidy({"hashtags": []}, 0, 10)["hashtags"]) == 3)
+check("manually cleared tags stay cleared", brain.clean_hashtags("", fill=False) == [])
+
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
 import shutil  # noqa: E402
 db.engine.dispose()

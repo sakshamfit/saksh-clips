@@ -1,0 +1,135 @@
+/* A quiet, neutral skin for the public landing page. The dashboard keeps its own palette. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --brand:#18181b; --brand-hi:#35353a; --ink:#171719; --soft:#f4f4f5; --line-b:#e4e4e7; --deep:#52525b;
+  --frame:#f6f6f7; --frame-2:#ededee; --frame-text:#171719; --frame-dim:#66666d;
+  --muted:#f6f6f7; --line:#ebebed; --line-2:#dcdce0; --text:#242427; --dim:#68686f; --faint:#81818a;
+  --on-primary:#fff; --surface:#fff; --surface-soft:#fafafa; --footer:#171719; --footer-text:#a5a5ac;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand:#f5f5f5; --brand-hi:#d7d7dc; --ink:#f3f3f5; --soft:#212124; --line-b:#39393e; --deep:#c5c5ca;
+  --frame:#151517; --frame-2:#202023; --frame-text:#f3f3f5; --frame-dim:#a3a3aa;
+  --muted:#19191c; --line:#29292d; --line-2:#39393e; --text:#eeeeef; --dim:#a6a6ae; --faint:#92929c;
+  --on-primary:#111113; --surface:#0b0b0d; --surface-soft:#121214; --footer:#09090b; --footer-text:#a6a6ae;
+}
+body {background:var(--surface);color:var(--text)}
+header.nav {background:var(--surface);border-color:var(--line)}
+header.nav .wrap {gap:16px}
+header.nav nav {gap:0}
+header.nav nav a:hover,header.nav .signin:hover {background:var(--muted);color:var(--text)}
+header.nav img {filter:grayscale(1)}
+[data-theme="dark"] header.nav img {filter:grayscale(1) invert(1)}
+.theme-toggle {display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--text);font:500 13px/1 Geist,system-ui,sans-serif;cursor:pointer;white-space:nowrap;transition:background-color .15s ease,border-color .15s ease}
+.theme-toggle:hover {background:var(--muted);border-color:var(--faint)}
+.theme-toggle .theme-symbol {font-size:17px;line-height:1}
+.btn {background:var(--surface);color:var(--text);border-color:var(--line-2);border-radius:10px}
+.btn:hover {background:var(--muted);border-color:var(--faint)}
+.btn.primary,.btn.dark {background:var(--brand);border-color:var(--brand);color:var(--on-primary)}
+.btn.primary:hover,.btn.dark:hover {background:var(--brand-hi);border-color:var(--brand-hi);color:var(--on-primary)}
+header.nav .btn.cta {border-radius:10px}
+:focus-visible {outline-color:var(--ink)}
+section {padding:88px 0}
+.wrap {max-width:1100px}
+h1 {font-size:clamp(38px,5vw,64px);line-height:1.07;letter-spacing:-.055em}
+h2 {font-size:clamp(29px,3.5vw,42px);line-height:1.16;letter-spacing:-.04em}
+h2 span {color:var(--dim)}
+.kicker {font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:16px}
+.sub {line-height:1.7}
+/* The animated title is the first focus; the rest of the page unfolds below it. */
+.particle-opening {background:var(--surface);min-height:calc(100svh - 60px);padding:60px 24px 28px;border-bottom:1px solid var(--line)}
+.particle-opening .opening-kicker {font-size:11px;letter-spacing:.23em;color:var(--dim)}
+.particle-opening #particle-title-root {min-height:clamp(190px,32vh,300px);width:min(100%,1040px)}
+.particle-opening #particle-title-root>div {height:clamp(190px,32vh,300px)}
+.particle-opening #particle-title-root>h2 {color:var(--ink)}
+.particle-opening .opening-caption {max-width:440px;font-size:15px;line-height:1.7;color:var(--dim);margin:0 auto 26px}
+#landing-composer-root {width:min(100%,560px);min-height:132px}
+.landing-composer {width:100%;text-align:left}
+.landing-composer form {max-width:none;box-shadow:none;border-color:var(--line-2);background:var(--surface);border-radius:16px}
+.landing-composer textarea {display:block;width:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;outline:0;resize:none;font-family:Geist,system-ui,sans-serif;color:var(--text)}
+.landing-composer textarea::placeholder {color:var(--faint)}
+.landing-composer form button {border:0;cursor:pointer;font-family:inherit}
+.landing-composer form button[aria-label="Upload a video in the app"] {background:transparent}
+.landing-composer form button[aria-label="Use this video link"] {background:var(--ink);color:var(--surface)}
+.landing-composer form button[aria-label="Use this video link"]:disabled {opacity:.3}
+.landing-composer .composer-instructions {margin:8px 14px 0;padding:12px 0 4px;border-top:1px solid var(--line);text-align:left}
+.landing-composer .composer-instructions label {display:block;margin-bottom:8px;color:var(--text);font-size:12px;font-weight:600}
+.landing-composer .composer-instructions label span {font-weight:400;color:var(--faint)}
+.landing-composer .composer-instructions textarea {min-height:40px;max-height:100px;font-size:13px;line-height:1.5}
+.landing-composer .composer-instructions small {display:block;text-align:right;color:var(--faint);font-size:10px}
+#landing-composer-root .fallback-instructions {display:block;margin:8px 10px 0;padding:10px 4px 0;border-top:1px solid var(--line);text-align:left;font-size:12px;color:var(--text)}
+#landing-composer-root .fallback-instructions textarea {display:block;width:100%;margin-top:8px;padding:0;border:0;background:transparent;color:var(--text);font:13px/1.5 Geist,system-ui,sans-serif;resize:vertical}
+.landing-composer svg {fill:none}
+.landing-composer svg.fill-current {fill:currentColor}
+.landing-composer .composer-hint {min-height:20px;margin:9px 4px 0;color:var(--faint);font-size:11px;text-align:center}
+.landing-composer .composer-hint[role="alert"] {color:#bb4545}
+.particle-opening .opening-actions {gap:22px;margin-top:8px}
+.particle-opening .opening-actions a {font-size:12px;color:var(--dim);text-decoration:none}
+.particle-opening .opening-actions a:hover {color:var(--ink)}
+.particle-opening .opening-scroll {color:var(--faint);padding-top:24px}
+.hero {background:var(--surface);padding:88px 0 0}
+.hero-copy {max-width:760px}
+.hero h1 .hl {background:none;color:var(--ink);padding:0;margin:0;border-radius:0;text-decoration:underline;text-decoration-color:var(--line-2);text-decoration-thickness:.09em;text-underline-offset:.11em}
+.hero .lede {max-width:560px;line-height:1.7;margin:20px auto 28px}
+.announce {background:var(--surface-soft);border-color:var(--line);color:var(--dim)}
+.announce:hover {border-color:var(--line-2)}
+.announce b {background:var(--soft);color:var(--ink)}
+.livepill {background:var(--ink);color:var(--surface)}
+.livepill i {background:var(--surface)}
+.bar {background:var(--surface);border-color:var(--line-2);border-radius:14px}
+.bar:focus-within {border-color:var(--ink)}
+.bar input {color:var(--text)}
+.bar input::placeholder {color:var(--faint)}
+.bar .btn {border-radius:9px}
+.ask .up {border-radius:10px}
+.notes svg {color:var(--dim)}
+.reel {gap:14px;margin-top:60px}
+.phone {border-radius:16px;border:4px solid var(--line);background:var(--muted)}
+.reel-note {margin-top:-28px}
+.sized {background:var(--surface)}
+.plats {gap:16px 40px}
+.plats span {font-size:15px;font-weight:500;color:var(--dim)}
+.open {background:var(--surface-soft);color:var(--text);border-block:1px solid var(--line);padding:88px 0}
+.open h2,.open h2 span {color:var(--ink)}
+.open .sub {color:var(--dim)}
+.trio {background:var(--line);border:1px solid var(--line);border-radius:14px;margin-top:36px}
+.trio div {background:var(--surface-soft);padding:24px}
+.trio b {font-size:27px;color:var(--ink)}
+.trio b small,.trio span {color:var(--dim)}
+.step .no,.mock,.cell,.flow span {background:var(--surface);border-color:var(--line)}
+.step .no {color:var(--dim)}
+.mock.result video {background:var(--muted)}
+.acts span.pri,.chips span.on,.cliprow .sc {background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.src,.flow span.hot,.cell .art,.ft {background:var(--muted);border-color:var(--line)}
+.src i {background:linear-gradient(150deg,#a1a1aa,#52525b,#18181b)}
+.in .meterbar i,.eq i,.jb .t i {background:var(--ink)}
+.cell {border-radius:14px;padding:26px;gap:20px}
+.cell .art {border-radius:10px}
+.caps img {background:var(--muted)}
+.tab {background:var(--surface);color:var(--dim)}
+.tab:hover {background:var(--muted)}
+.tab[aria-selected=true] {background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.panel {border-color:var(--line);background:var(--surface)}
+.closing {background:var(--surface-soft);border-block:1px solid var(--line)}
+.closing .sub {margin-bottom:28px}
+[data-theme="dark"] .announce,[data-theme="dark"] .mock,[data-theme="dark"] .cell,[data-theme="dark"] .panel,[data-theme="dark"] .flow span {background:var(--surface-soft)}
+[data-theme="dark"] .field,[data-theme="dark"] .acts span,[data-theme="dark"] .drop {border-color:var(--line-2)}
+[data-theme="dark"] .phone {border-color:#34343a}
+[data-theme="dark"] .livepill {color:#111113}
+@media (max-width:960px) {section {padding:64px 0}.hero {padding-top:64px}.open {padding:64px 0}}
+@media (max-width:560px) {
+  header.nav .wrap {gap:8px;padding:0 16px}
+  header.nav img {height:32px}
+  header.nav .btn.cta {font-size:13px;padding:0 12px;height:36px}
+  .theme-toggle {width:36px;padding:0;flex:none}
+  .theme-label {display:none}
+  .particle-opening {padding:48px 18px 22px}
+  .particle-opening #particle-title-root {min-height:210px}
+  .particle-opening #particle-title-root>div {height:210px}
+  .particle-opening .opening-caption {font-size:14px}
+  .particle-opening .opening-actions {gap:12px 20px}
+  .hero {padding-top:64px}
+  .reel {margin-top:40px}
+  .trio div {padding:20px}
+}
+@media (prefers-reduced-motion:reduce) {html {scroll-behavior:auto}}

@@ -96,6 +96,12 @@ def main(data):
                   clip["status"] == "done" and has_dialogue(encode.call_args.args[-1], "Cap", "POLISHED")
                   and not prepare.called)
 
+            changed = server.rerender(job["id"], clip["id"], {"auto_edit": False, "sound_fx": False})
+            check("clip editor can independently disable punch-ins and sound accents",
+                  changed["clips"][0]["auto_edit"] is False and changed["clips"][0]["sound_fx"] is False)
+            jobs.render_one(job, clip, WORDS)
+            check("sound preference reaches the renderer on re-make", encode.call_args.kwargs["sound_fx"] is False)
+
             render.render_clip(Path(data) / "source.mp4", Path(data) / "clips", "direct",
                                dict(clip, captions=False), WORDS, 1920, 1080)
             ass = encode.call_args.args[-1]
