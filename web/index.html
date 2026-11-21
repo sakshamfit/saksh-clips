@@ -405,6 +405,21 @@ img.av{object-fit:cover}
 .range>svg{width:14px;height:14px;color:var(--faint);flex:none}
 @media (max-width:640px){.og{grid-template-columns:1fr}.nsteps{grid-template-columns:1fr}}
 
+/* ---------- the look this batch will be made in, right on the composer */
+.lookbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px 8px}
+.lookbar:empty{display:none}
+.look-btn{display:flex;align-items:center;gap:10px;padding:6px 10px 6px 8px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);cursor:pointer;text-align:left;transition:background-color .15s ease,border-color .15s ease}
+.look-btn:hover,.look-btn:focus-visible{background:#FFF7F1;border-color:#E8CDB8}
+.look-btn .lay-prev{height:34px;width:22px;border-radius:5px}
+.look-btn .lay-prev .ph{width:18px;height:32px;border-radius:3px}
+.look-btn .lay-prev .ph i{height:11px}
+.look-btn .look-tx{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.look-btn .look-tx b{font-size:13px;font-weight:600;color:var(--brand-ink)}
+.look-btn .look-tx em{font-style:normal;font-size:12px;color:var(--dim)}
+.look-btn .look-edit{font-size:12px;font-weight:600;color:var(--brand-deep);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin-left:4px}
+.look-note{font-size:12px;color:var(--faint)}
+.composer.big .lookbar{padding-bottom:10px}
+
 /* ---------- choosing the framing and the caption style before any clipping starts */
 dialog.pickdlg{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:var(--r-lg);padding:0;width:720px;max-width:calc(100vw - 32px)}
 .pd{padding:22px 24px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 40px);overflow:auto}
@@ -1405,21 +1420,21 @@ function drawAdd(variant) {
     <div class="composer-bar">
       <button type="button" class="chip" data-act="pickfile">${ic("up")}Upload video</button>
       ${c ? "" : picker("o_creator", "File under creator", [{v:"", label:"No creator", icon:"user"}, ...S.creators.map(x => ({v:x.id, label:x.name, img:x.profile?.pic && x.profile.channel === x.channel ? avatarUrl(x) : ""}))], "")}
-      <button type="button" class="chip" data-act="toggleopts" aria-expanded="false">${ic("sliders")}Options</button>
+      <button type="button" class="chip" data-act="openpick">${ic("sliders")}Framing &amp; style</button>
+      <button type="button" class="chip" data-act="toggleopts" aria-expanded="false">${ic("cog")}Options</button>
       <span class="grow"></span><span class="hint">or drop a video file here</span>
-      <button class="btn primary" id="goBtn">${ic("scissors")}Make clips</button>
+      <button class="btn primary" id="goBtn" title="Choose the framing and the caption style, then start">${ic("sliders")}Choose the look</button>
     </div>
+    <div class="lookbar" id="lookbar"></div>
     <div class="composer-opts" inert><div class="og">
       <div class="ob wide"><div class="ot">Clips</div><div class="nsteps">
         ${stepper("o_max", "How many", c?.max_clips ?? 6, 1, 20, 1, "")}
         ${stepper("o_min", "Shortest", c?.min_len ?? 15, 5, 120, 5, "s")}
         ${stepper("o_maxlen", "Longest", c?.max_len ?? 60, 10, 180, 5, "s")}
       </div></div>
-      <div class="ob"><div class="ot cap-head"><span id="o_style_label">Caption style</span>
-        <label><input type="checkbox" id="o_captions" data-caption-toggle ${c?.captions === false ? "" : "checked"}>Generate captions</label></div>
-      <p class="sub" style="margin:0 0 2px;font-size:12px">Leave these as they are to be asked before each batch, with a preview.</p>
-        ${choice("o_style", Object.entries(S.status.styles).map(([k, v]) => ({v:k, label:v, prev:capPrev(k)})), c?.style ?? "bounce", c?.captions === false)}</div>
-      <div class="ob"><div class="ot cap-head"><span>Layout</span><em class="sub" style="font-style:normal;font-weight:500">Also asked when you press Make clips</em></div>${choice("o_layout", Object.entries(S.status.layouts).map(([k, v]) => ({v:k, label:LAYOUT_SHORT[k] || v, title:v, prev:`<span class="lay-prev ${esc(k)}"><span class="ph"><i></i></span></span>`})), c?.layout ?? "blur")}</div>
+      <div class="ob wide"><div class="ot cap-head"><span>Framing and captions</span>
+        <button type="button" class="lnk" data-act="openpick" style="border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--brand-deep);cursor:pointer;padding:0">Choose them with a preview &rsaquo;</button></div>
+        <p class="sub" style="margin:0;font-size:12px">Picked before every batch, on the video itself: the framing (blurred fill, zoomed, fill screen, gameplay with the webcam) and the caption style.</p></div>
       <div class="ob"><div class="ot">Video quality</div><input type="hidden" id="o_quality" value="720"><div class="seg" role="group" aria-label="Video quality">
         <button type="button" data-seg="o_quality" data-v="720" aria-pressed="true">720p<small>Fast</small></button>
         <button type="button" data-seg="o_quality" data-v="1080" aria-pressed="false">1080p<small>Sharper, about 2x slower</small></button></div></div>
@@ -1431,11 +1446,6 @@ function drawAdd(variant) {
 }
 const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", gameplay:"Gameplay + facecam"};
 const CAP_LOOK = {bounce:{font:"'Archivo Black'", hl:"#FFFF00", up:true}, hype:{font:"Anton", hl:"#FF3C3C", up:true}, clean:{font:"Poppins", hl:"#6BD7FF", up:false, w:800}};
-function capPrev(k) {
-  const s = CAP_LOOK[k] || {font:"inherit", hl:"#FF8B33", up:true};
-  const t = s.up ? ["CLIP", "THIS"] : ["Clip", "this"];
-  return `<span class="cap-prev" style="font-family:${s.font},sans-serif;font-weight:${s.w || 400}">${t[0]}&nbsp;<b style="color:${s.hl}">${t[1]}</b></span>`;
-}
 function picker(id, aria, items, val) {
   const cur = items.find(x => String(x.v) === String(val)) || items[0];
   const av = x => x.img ? `<img class="av" src="${x.img}" alt="">` : `<span class="av">${x.icon ? ic(x.icon) : esc((x.label || "?").trim().slice(0, 1).toUpperCase())}</span>`;
@@ -1448,11 +1458,6 @@ function stepper(id, label, val, min, max, step, unit) {
     <button type="button" data-step="${id}" data-d="-1" aria-label="Less">${ic("minus")}</button>
     <input id="${id}" type="number" min="${min}" max="${max}" step="${step}" value="${esc(val)}" aria-label="${esc(label)}">${unit ? `<i>${unit}</i>` : ""}
     <button type="button" data-step="${id}" data-d="1" aria-label="More">${ic("plus")}</button></div></div>`;
-}
-function choice(id, items, val, disabled = false) {
-  const captions = id === "o_style";
-  return `<input type="hidden" id="${id}" value="${esc(val)}"><div class="tiles3" role="group"${captions ? ' aria-labelledby="o_style_label"' : ""}>${items.map(x =>
-    `<button type="button" class="tile-o" data-seg="${id}" data-v="${esc(x.v)}" aria-pressed="${String(x.v) === String(val)}"${captions ? " data-caption-style" : ""}${disabled ? " disabled" : ""}${x.title ? ` title="${esc(x.title)}"` : ""}>${x.prev}${esc(x.label)}</button>`).join("")}</div>`;
 }
 const closePicks = except => $$(".pick.open").forEach(p => { if (p !== except) { p.classList.remove("open"); p.querySelector(".pick-btn").setAttribute("aria-expanded", "false"); } });
 document.addEventListener("click", e => {
@@ -1487,7 +1492,9 @@ document.addEventListener("keydown", e => {
 const targetCreator = () => creatorId() || $("#o_creator")?.value || "";
 function jobOptions() {
   const n = id => { const v = $(id).value; return v === "" ? null : Number(v); };
-  const o = {max_clips:n("#o_max"), min_len:n("#o_min"), max_len:n("#o_maxlen"), captions:$("#o_captions").checked, style:$("#o_style").value, layout:$("#o_layout").value, quality:n("#o_quality")};
+  // The framing, the caption style and whether there are captions are chosen in the chooser, which is what the
+  // person sees before anything is made; only the numbers and the part of the video come from this panel.
+  const o = {max_clips:n("#o_max"), min_len:n("#o_min"), max_len:n("#o_maxlen"), quality:n("#o_quality")};
   if (n("#o_from") !== null) o.range_start = n("#o_from") * 60;
   if (n("#o_to") !== null) o.range_end = n("#o_to") * 60;
   return o;
@@ -1530,6 +1537,23 @@ function rowHtml(A, {id, kind, thumb, len, title, sub, side, bar}) {
     ${A.busy ? "" : `<button type="button" class="rm" data-rm="${kind}" data-id="${id}" aria-label="Remove ${esc(title)}">${ic("x")}</button>`}
     ${bar != null ? `<i class="pbar" style="width:${bar}%"></i>` : ""}</div>`;
 }
+/* The look this batch will be made in, on the composer itself, so it is never a surprise: the framing, the caption
+   style, and a way to change either with one press. Before anything is chosen it says so, plainly. */
+function drawLookBar() {
+  const box = $("#lookbar"); if (!box) return;
+  const A = att();
+  const d = {...pickDefaults(A), ...(S.lastPick || {})};
+  const chosen = !!S.lastPick;
+  const caps = d.captions !== false;
+  const layTxt = LAYOUT_SHORT[d.layout] || d.layout, styTxt = S.status?.styles?.[d.style] || LOOK_STYLES[d.style] || d.style;
+  const h = `<button type="button" class="look-btn" data-act="openpick" aria-label="Change the framing and caption style">
+      <span class="lay-prev ${esc(d.layout)}" style="height:34px;width:22px"><span class="ph" style="width:18px;height:32px"><i></i></span></span>
+      <span class="look-tx"><b>${esc(layTxt)}</b><em>${caps ? esc(styTxt) + " captions" : "No captions"}</em></span>
+      <span class="look-edit">${chosen ? "Change" : "Choose"}</span></button>
+    ${chosen ? "" : `<span class="look-note">Pick these before clipping &mdash; you will see them on the video.</span>`}`;
+  if (box.innerHTML !== h) box.innerHTML = h;
+}
+
 function drawAtt() {
   const box = $("#attIn"); if (!box) return;
   const A = att();
@@ -1559,10 +1583,16 @@ function drawAtt() {
   }, {once: true}));
   $("#att")?.classList.toggle("has", !!h);
   const u = $("#url"); if (u) u.placeholder = A.links.length || A.files.length ? "Paste another link" : "Paste a YouTube, Twitch or Kick video link";
+  drawLookBar();
   const b = $("#goBtn");
   if (b) { b.disabled = A.busy;
     const k = A.files.length + A.links.filter(l => l.state === "ok").length;
-    b.innerHTML = A.busy ? `${ic("up")}Sending…` : A.queued ? `${ic("clock")}Finding video…` : `${ic("sliders")}Choose the look${k > 1 ? ` (${k})` : ""}`; }
+    // Nothing chosen yet: the button says what pressing it does first (pick the framing and style, with a preview).
+    // Once a look is chosen it is on the bar above, so the button goes back to starting the clips.
+    const look = !S.lastPick;
+    b.innerHTML = A.busy ? `${ic("up")}Sending…` : A.queued ? `${ic("clock")}Finding video…`
+      : look ? `${ic("sliders")}Choose the look${k > 1 ? ` (${k})` : ""}`
+      : `${ic("scissors")}Make clips${k > 1 ? ` (${k})` : ""}`; }
 }
 
 async function lookUp(u) {
@@ -1903,8 +1933,13 @@ async function makeClips() {
     return;
   }
   // Nothing is made until the framing and style are chosen: the chooser shows both on the video itself.
-  const chosen = await openPick(A);
+  // If the browser cannot show the dialog at all, the framing and style already chosen on the composer are used
+  // instead of guessing: a person's own last choice, or the creator's, or the defaults - never something new.
+  let chosen;
+  try { chosen = await openPick(A); }
+  catch (e) { toast("Couldn't open the choices here; using the look shown above. " + (e.message || ""), "bad"); chosen = {...pickDefaults(A)}; }
   if (!chosen) { drawAtt(); return; }                    // cancelled: nothing was sent, nothing was spent
+  S.lastPick = chosen;
   A.busy = true; drawAtt();
   let started = 0, failed = 0;
   const who = targetCreator(), opts = {...jobOptions(), ...chosen};
@@ -2520,15 +2555,12 @@ document.addEventListener("dragover", e => { const a = $(".composer"); if (a) { 
 document.addEventListener("dragleave", () => $(".composer")?.classList.remove("over"));
 document.addEventListener("drop", e => { const a = $(".composer"); if (a) { e.preventDefault(); a.classList.remove("over"); attach(e.dataTransfer.files); } });
 function syncCaptionStyle(toggle) {
-  toggle.closest("#addform, #cform, #clipdlg").querySelectorAll("[data-caption-style]").forEach(i => i.disabled = !toggle.checked);
+  const box = toggle.closest("#addform, #cform, #clipdlg");
+  if (box) box.querySelectorAll("[data-caption-style]").forEach(i => i.disabled = !toggle.checked);
 }
 document.addEventListener("change", async e => {
   const t = e.target;
-  if (t.id === "o_creator") {
-    const toggle = $("#o_captions"), c = S.creators.find(c => c.id === t.value);
-    if (!toggle.dataset.overridden) { toggle.checked = c?.captions !== false; syncCaptionStyle(toggle); }
-    return;
-  }
+  if (t.id === "o_creator") { drawLookBar(); return; }     // the composer shows that creator's own look
   if (t.hasAttribute("data-caption-toggle")) {
     if (t.id === "o_captions") t.dataset.overridden = "true";
     syncCaptionStyle(t);
@@ -2594,6 +2626,11 @@ document.addEventListener("click", async e => {
     }
     if (a === "menu") return $("#app").classList.toggle("open");
     if (a === "collapse") { const m = $("#app").classList.toggle("mini"); try { localStorage.setItem("mini", m ? "1" : ""); } catch {} return; }
+    if (a === "openpick") {
+      const chosen = await openPick(att());
+      if (chosen) { S.lastPick = chosen; drawAtt(); toast("Saved: " + (LAYOUT_SHORT[chosen.layout] || chosen.layout) + " · " + (S.status?.styles?.[chosen.style] || chosen.style), "ok"); }
+      return;
+    }
     if (a === "toggleopts") { const p = $(".composer-opts"), open = !p.classList.contains("open"); p.classList.toggle("open", open); p.inert = !open; b.classList.toggle("on", open); b.setAttribute("aria-expanded", String(open)); return; }
     if (a === "focusurl") return $("#url")?.focus();
     if (a === "step") {
