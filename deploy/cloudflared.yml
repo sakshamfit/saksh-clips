@@ -1,0 +1,23 @@
+# Anhy Clips behind a Cloudflare Tunnel: no port is opened on the server, and there is no certificate to renew.
+#
+# Use it by adding this line to .env on the server (and leaving COMPOSE_PROFILES=own-https out):
+#   COMPOSE_FILE=docker-compose.yml:deploy/docker-compose.cloudflared.yml
+#
+# Then follow "Cloudflare Tunnel" in DEPLOY.md, which is where the tunnel and its token come from.
+#
+# Anhy Clips keeps listening only on 127.0.0.1:8765. The tunnel comes in from outside, so it is the one that has to
+# reach that address: it runs on this server's own network rather than Docker's, so 127.0.0.1 is the server itself,
+# which is also what the Cloudflare dashboard uses for this tunnel's public hostname.
+# (To run it inside Docker's network instead, remove the network_mode line and put that hostname's Service down as
+# http://app:8765. One of the two, never both.)
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on: [app]
+    network_mode: host
+    command: tunnel --no-autoupdate run
+    environment:
+      # From Cloudflare, when the tunnel was made in its dashboard (see DEPLOY.md). Anyone with this can run
+      # traffic through your tunnel, so it lives in .env, which is never published, and nowhere else.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env, from the Cloudflare dashboard}

@@ -6,7 +6,8 @@ Anhy Clips runs as three containers on one Linux server: the app, PostgreSQL, an
 
 - A Linux server with Docker. Clipping is CPU work: plan on **8+ CPU cores, 16 GB RAM and 200+ GB of disk** if
   several people will use it. Transcription runs at roughly 10x real time per video on 4 cores.
-- A domain name pointing at the server (an `A` record).
+- A domain name pointing at the server (an `A` record). No public address, or no ports to open? See
+  [Cloudflare Tunnel](#cloudflare-tunnel-no-ports-no-certificate) instead: it needs no `A` record and no open port.
 - An AI key (see "Choose your AI" in the README). Optional: a Google "Web application" OAuth client, and an SMTP
   service for emails.
 
@@ -114,7 +115,92 @@ Leave `COMPOSE_PROFILES=own-https` out of `.env`. Anhy Clips then listens only o
 server that is already there forwards the domain to it: see `deploy/nginx-anhy.conf`, or
 `deploy/docker-compose.traefik.yml` for Traefik.
 
+## Cloudflare Tunnel (no ports, no certificate)
+
+A tunnel is a way to put Anhy Clips on the internet without opening any port on the server and without Caddy: a
+small program, `cloudflared`, sits on the server and dials out to Cloudflare; visitors reach Cloudflare and
+Cloudflare passes the request down that connection. It also suits a computer that has no public address at all
+(home broadband with no port forwarding, a server behind someone else's firewall, a laptop kept awake).
+
+What it cannot fix: a tunnel is not faster, uploads still pass through Cloudflare's 100 MB request limit (Anhy
+Clips already sends big files in pieces), and the free plan is meant for the traffic of a small site.
+
+1. **The domain has to be on Cloudflare.** If its nameservers are still at your registrar, add the domain in
+   Cloudflare and change the nameservers there first, then wait for Cloudflare to say the zone is active.
+2. **Make the tunnel.** In the Cloudflare dashboard open **Zero Trust, Networks, Tunnels, Create a tunnel**, pick
+   **Cloudflared**, name it `anhy-clips`, save, and copy **the token** it shows you (the long line after `--token`).
+   Treat the token like a password: whoever has it can send traffic through your tunnel.
+3. **Give it the address to answer on.** On the tunnel's page, **Public hostname, Add a public hostname**:
+   - Subdomain: `clips` (or whatever you want) and Domain: your domain. That address is what people will open, so
+     it is the one to write down as `ANHY_DOMAIN` from here on.
+   - Service: **HTTP**, and URL: `127.0.0.1:8765`.
+
+   With Docker (the next step) `127.0.0.1` is the server itself, because the tunnel container runs on the server's
+   own network rather than Docker's. If you run `cloudflared` as a program on the server instead of in Docker,
+   it is the same address.
+4. **Tell Anhy Clips, and start both.** In `.env` on the server:
+
+   ```
+   ANHY_DOMAIN=clips.example.com
+   POSTGRES_PASSWORD=a-long-string-you-make-up
+   TUNNEL_TOKEN=eyJhIjoi...            # the token from step 2
+   ANHY_PUBLIC_URL=https://clips.example.com
+   ANHY_CLIENT_IP_HEADER=CF-Connecting-IP
+   COMPOSE_FILE=docker-compose.yml:deploy/docker-compose.cloudflared.yml
+   ```
+
+   Leave `COMPOSE_PROFILES=own-https` out: Caddy has nothing to do here, and ports 80 and 443 stay closed. Then
+   `docker compose up -d --build`. The tunnel's page in Cloudflare turns **Healthy** within a minute or two.
+   (`COMPOSE_FILE` is what brings in `deploy/cloudflared.yml`, which is the tunnel as a fourth container.)
+   Accounts are on with Docker, so the rest of "Steps" above applies: sign up, make yourself an admin, add your
+   AI key.
+5. **Check it.** `https://clips.example.com/healthz` answers `{"ok":true}`, and the dashboard opens. Nothing in
+   **SSL/TLS** needs touching: the tunnel itself is encrypted, there is no origin certificate, and nothing but
+   Cloudflare can reach Anhy Clips.
+
+### Without Docker
+
+`cloudflared` can be installed on the server by itself: `deploy/cloudflared-config.yml` is the tunnel's settings
+file for that: the tunnel id, the hostname and the same `127.0.0.1:8765` sit in it, with the commands that make
+the tunnel and install it as a service written at the top. Run Anhy Clips as usual (`python -m anhy.server`, or
+`docker compose up -d db app` with only the tunnel installed on the server) and set the same `.env` lines:
+`ANHY_DOMAIN`, `ANHY_PUBLIC_URL`, `ANHY_CLIENT_IP_HEADER`, and **not** `COMPOSE_FILE`, so no tunnel container is
+started.
+
+### Trying it quickly, before deciding
+
+Cloudflare's **quick tunnel** needs no account, no domain and no token: run `cloudflared tunnel --url http://127.0.0.1:8765`
+(`docker run --rm --network host cloudflare/cloudflared tunnel --url http://127.0.0.1:8765` if Docker is what you
+have) and it prints a random `https://something.trycloudflare.com` address that works in seconds. Two things to
+know: the address changes every time it starts, and it does not always pass the address in `--url` through, so the
+page may answer `Open Anhy Clips by its own address` (that is the check in "If something does not work" below).
+Add `--http-host-header` with the random address to make it match, and copy that address into `ANHY_PUBLIC_URL`
+before starting Anhy Clips. Either way a quick tunnel is for a look, not for posting: sign-in,
+the connected apps and Buffer want a stable https address.
+
+### If something does not work
+
+- **`Open Anhy Clips by its own address`**: with accounts off (`ANHY_ACCOUNTS=0`) Anhy Clips only answers to the
+  address it knows as its own, and a tunnel can send a different one. Set `ANHY_PUBLIC_URL` to the tunnel's
+  address; with a settings file also set `httpHostHeader` as shown. With Docker, accounts are on by default and it
+  does not come up.
+- **The tunnel says Healthy but the page is an error**: the Service in the public hostname must be the address
+  Anhy Clips really listens on, `127.0.0.1:8765` (or the port in `ANHY_BIND_PORT`) — not `app:8765`, which only
+  works between Docker containers, and the tunnel container in `deploy/cloudflared.yml` is not on Docker's network.
+  (To put it there instead, drop `network_mode: host` and use `app:8765` as the Service.)
+- **A sign-in page that never finishes, or a save refused** — the address must be the same everywhere: the public
+  hostname, `ANHY_PUBLIC_URL`, and the redirect addresses registered with Google, Instagram, TikTok and Buffer.
+  A wrong one is the usual cause. They are listed in "Google setup" above and in `.env.example`.
+- **Uploads stop at about 100 MB**: that is Cloudflare's own request limit, not Anhy Clips. `ANHY_UPLOAD_PART_MB`
+  (40 by default) keeps single requests under it; lower it further if a proxy in front is stricter still.
+- **Everything comes from one address in the rate limits**: that is Cloudflare. `ANHY_CLIENT_IP_HEADER=CF-Connecting-IP`
+  makes Anhy Clips read each visitor from Cloudflare's own header instead, and the header is believed only when the
+  request really came from Cloudflare.
+
 ## Cloudflare CDN in front
+
+A different arrangement from the tunnel above: the domain points at the server (`A` record, orange cloud) and the
+server serves it, with Caddy or nginx doing HTTPS. The tunnel above needs none of this.
 
 With the record proxied (orange cloud):
 

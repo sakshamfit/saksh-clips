@@ -1,0 +1,23 @@
+# Anhy Clips behind a Cloudflare Tunnel that you run yourself, with cloudflared installed on the server instead of
+# in Docker. This is the local-config version: DEPLOY.md, "Cloudflare Tunnel" shows the one the dashboard gives you,
+# which needs no file at all and is easier.
+#
+#   1. cloudflared tunnel create anhy-clips          then note the id it prints
+#   2. put that id below, in both places
+#   3. cloudflared tunnel route dns anhy-clips clips.example.com
+#   4. sudo cp this file to /etc/cloudflared/config.yml, and ~/.cloudflared/<id>.json to /etc/cloudflared/
+#   5. sudo cloudflared service install   (once; it starts on every boot from then on)
+
+tunnel: REPLACE-WITH-THE-TUNNEL-ID
+credentials-file: /etc/cloudflared/REPLACE-WITH-THE-TUNNEL-ID.json
+
+ingress:
+  - hostname: clips.example.com
+    service: http://localhost:8765
+    originRequest:
+      # Anhy Clips only answers to the address it knows as its own (ANHY_PUBLIC_URL), so tell it that one even
+      # though the tunnel really speaks to 127.0.0.1. Leave this out and every page answers "Open Anhy Clips by
+      # its own address".
+      httpHostHeader: clips.example.com
+  # Everything else is refused, so a hostname pointed here by mistake is not silently served your site.
+  - service: http_status:404

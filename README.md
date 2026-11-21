@@ -178,6 +178,10 @@ are sent to GitHub; set `ANHY_UPDATE_CHECK=0` to turn the check off.
 docker compose up -d --build
 ```
 
+No public address, or no ports to open? [DEPLOY.md](DEPLOY.md#cloudflare-tunnel-no-ports-no-certificate) puts the
+same stack behind a Cloudflare Tunnel: `cloudflared` dials out, so nothing has to be let in, and there is no
+certificate to renew.
+
 ## How it behaves under load
 
 - The page asks the server one small question every few seconds. When nothing has changed, the answer comes
