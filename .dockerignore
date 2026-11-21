@@ -5,5 +5,8 @@ data
 .git
 tests
 **/__pycache__
+web/node_modules
+.venv
+.arena
 *.bat
 *.md

@@ -425,9 +425,12 @@ def brand(name: str):
 
 @app.get("/assets/{name}")
 def asset(name: str):
-    if not re.fullmatch(r"[\w\-]+\.js", name) or not (WEB / name).is_file():
+    # Keep the existing JS asset route; only the particle stylesheet is public CSS.
+    if not (re.fullmatch(r"[\w\-]+\.js", name) or name in ("particle-title.css", "landing-theme.css", "orion-footer.css")) or not (WEB / name).is_file():
         raise HTTPException(404)
-    return FileResponse(WEB / name, media_type="text/javascript", headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"})
+    media_type = "text/css" if name.endswith(".css") else "text/javascript"
+    cache = "public, max-age=300" if name in ("particle-title.js", "particle-title.css", "landing-theme.css", "orion-footer.css") else "public, max-age=86400, stale-while-revalidate=604800"
+    return FileResponse(WEB / name, media_type=media_type, headers={"Cache-Control": cache})
 
 
 @app.get("/favicon.ico")

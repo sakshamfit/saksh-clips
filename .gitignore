@@ -34,3 +34,9 @@ venv/
 # ---- local binaries (ffmpeg/ffprobe fetched for this machine)
 /bin/
 /ffmpeg/
+
+# JS build dependencies (the generated public assets are tracked)
+web/node_modules/
+
+# Local preview data and process state
+.arena/
