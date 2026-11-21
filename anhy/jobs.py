@@ -109,7 +109,7 @@ on_clip_ready: list = []   # callbacks (job, clip), run once when a clip first f
 
 DEFAULTS = {"max_clips": 6, "min_len": 15, "max_len": 60, "style": "bounce", "layout": "blur", "quality": 720,
             "range_start": None, "range_end": None, "captions": True, "instructions": "",
-            "auto_edit": True, "sound_fx": True}
+            "edit_style": "pro", "auto_edit": True, "sound_fx": True}
 
 
 LIMITS = {"max_clips": (1, 20), "min_len": (5, 120), "max_len": (10, 180), "quality": (360, 1080)}
@@ -123,6 +123,11 @@ def clean_options(options) -> dict:
             if not isinstance(v, bool):
                 raise ValueError(f"{k.replace('_', ' ').capitalize()} must be on or off.")
             out[k] = v
+            continue
+        if k == "edit_style":
+            if not isinstance(v, str) or v.strip().lower() not in render.EDIT_STYLES:
+                raise ValueError("Edit style must be off, balanced, pro, or energetic.")
+            out[k] = v.strip().lower()
             continue
         if k == "instructions":
             if not isinstance(v, str) or len(v) > 500:
@@ -143,6 +148,10 @@ def clean_options(options) -> dict:
             if not math.isfinite(v) or v < 0:
                 raise ValueError("That part of the video isn't valid.")
         out[k] = v
+    if "edit_style" in out:
+        out["auto_edit"] = (out["edit_style"] != "off")
+    elif "auto_edit" in out:
+        out["edit_style"] = "pro" if out["auto_edit"] else "off"
     if out.get("range_end") is not None and out["range_end"] <= out.get("range_start", 0):
         raise ValueError("The end of the chosen part must be after its start.")
     return out
@@ -294,10 +303,13 @@ def create(source: dict, options: dict, enqueue=True, creator=None, kind="video"
     c = creators.get(creator) if creator else None
     if c:
         d = creators.root(c["id"]) / ("live" if kind == "live" else "videos") / jid
-        base = {**DEFAULTS, **{k: c[k] for k in ("max_clips", "min_len", "max_len", "style", "layout", "captions")}}
+        base = {**DEFAULTS, **{k: c[k] for k in ("max_clips", "min_len", "max_len", "style", "layout", "captions",
+                                                 "edit_style", "auto_edit", "sound_fx") if k in c}}
     else:
         d, base, creator = config.user_dir(ctx.uid()) / "jobs" / jid, dict(DEFAULTS), None
     opts = {**base, **clean_options(options)}
+    opts["edit_style"] = render.normalize_edit_style(opts)
+    opts["auto_edit"] = (opts["edit_style"] != "off")
     if opts["min_len"] >= opts["max_len"]:
         opts["min_len"] = max(5, opts["max_len"] - 5)
     job = {"id": jid, "user": ctx.uid(), "kind": kind, "creator": creator, "dir": str(d), "created": time.time(), "source": source,
@@ -352,9 +364,10 @@ def request_render(jid, cid, changes: dict):
     job = _jobs[jid]
     clip = next(c for c in job["clips"] if c["id"] == cid)
     new = dict(clip)
-    for setting in ("captions", "auto_edit", "sound_fx"):
-        if setting in changes:
-            new.update(clean_options({setting: changes[setting]}))
+    # Handle edit_style and legacy auto_edit/sound_fx/captions cleanly together.
+    edit_patch = {k: changes[k] for k in ("captions", "edit_style", "auto_edit", "sound_fx") if k in changes}
+    if edit_patch:
+        new.update(clean_options(edit_patch))
     for k in ("start", "end"):
         if k in changes:
             new[k] = round(float(changes[k]), 2)
@@ -779,9 +792,11 @@ def _run_job(job):
                     keep.append(c)
             found = keep
         for c in found:
+            shifted_beats = [round(float(t) + shift, 2) for t in c.get("edit_beats", []) if isinstance(t, (int, float))]
+            es = render.normalize_edit_style(o)
             c.update(id=f"clip{len(job['clips']) + 1:02d}", start=round(c["start"] + shift, 2),
-                     end=round(c["end"] + shift, 2), style=o["style"], layout=o["layout"],
-                     captions=o.get("captions", True), auto_edit=o.get("auto_edit", True),
+                     end=round(c["end"] + shift, 2), edit_beats=shifted_beats, style=o["style"], layout=o["layout"],
+                     captions=o.get("captions", True), edit_style=es, auto_edit=(es != "off"),
                      sound_fx=o.get("sound_fx", True), status="queued", version=0)
             # Only the gameplay layout uses a webcam, so it is only looked for then, and only once: a
             # stream with no webcam is not looked for again on every clip of it.
@@ -842,8 +857,12 @@ def _worker(quick_only=False):
             else:
                 clip = next(c for c in job["clips"] if c["id"] == cid)
                 words = []
-                if clip.get("captions", True):
-                    words = json.loads((Path(job["dir"]) / "words.json").read_text(encoding="utf-8"))
+                wf = Path(job["dir"]) / "words.json"
+                if wf.is_file():
+                    try:
+                        words = json.loads(wf.read_text(encoding="utf-8"))
+                    except ValueError:
+                        words = []
                 render_one(job, clip, words)
         except Exception as e:  # noqa: BLE001
             (Path(job["dir"]) / "error.log").write_text(traceback.format_exc(), encoding="utf-8")

@@ -553,27 +553,35 @@ class Session:
 
     def _manual_step(self):
         for req in [m for m in self.manual if m["end"] <= self.t_done or self.ended]:
-            text = " ".join(w["w"] for w in self.words if req["start"] <= w["s"] <= req["end"])
+            clip_start = round(req["start"], 2)
+            clip_end = round(min(req["end"], self.samples / SR), 2)
+            seg_words = [dict(w, s=round(w["s"] - clip_start, 2), e=round(w["e"] - clip_start, 2))
+                         for w in self.words if req["start"] <= w["s"] <= req["end"]]
+            lines = brain.make_lines(seg_words)
+            text = "\n".join(f"[{l['s']:.1f}] {l['text']}" for l in lines) if lines else " ".join(w["w"] for w in seg_words)
             usage.set_context(self.job["creator"], self.job["title"] or "Live stream")
             try:
                 c = brain.describe(text, self.job["title"], self.job["uploader"], game=self._game(),
-                                   timeout=config.LIVE_AI_TIMEOUT)
+                                   timeout=config.LIVE_AI_TIMEOUT, duration=max(0.0, clip_end - clip_start))
             except Exception as e:  # noqa: BLE001
                 # Someone asked for this clip by hand. A slow or broken AI costs it its hook, not the clip.
                 self.job["ai"]["last_error"] = str(e)[-200:]
                 c = {"score": 0, "category": "other", "hook": "", "title": self.job["title"],
-                     "description": "", "hashtags": [], "highlight_words": []}
+                     "description": "", "hashtags": [], "highlight_words": [], "edit_beats": []}
             self.manual.remove(req)
-            c.update(start=round(req["start"], 2), end=round(min(req["end"], self.samples / SR), 2), score=0)
+            shifted_beats = [round(clip_start + float(b), 2) for b in c.get("edit_beats", []) if isinstance(b, (int, float))]
+            c.update(start=clip_start, end=clip_end, edit_beats=shifted_beats, score=0)
             if req.get("why"):
                 c["reason"] = req["why"]
             self._add_clip(c)
 
     def _add_clip(self, c):
         self.n += 1
+        es = render.normalize_edit_style(self.settings if "edit_style" in self.settings else self.job["options"])
+        sfx = self.settings.get("sound_fx", self.job["options"].get("sound_fx", True))
         c.update(id=f"clip{self.n:03d}", style=self.settings["style"], layout=self.settings["layout"],
-                 captions=self.job["options"].get("captions", True),
-                 auto_edit=self.job["options"].get("auto_edit", True), sound_fx=self.job["options"].get("sound_fx", True),
+                 captions=self.settings.get("captions", self.job["options"].get("captions", True)),
+                 edit_style=es, auto_edit=(es != "off"), sound_fx=bool(sfx),
                  status="queued", version=0, made_at=time.time())
         with self.lock:
             self.job["clips"].append(c)
