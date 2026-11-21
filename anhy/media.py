@@ -13,14 +13,24 @@ from . import config
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
+# The endings Anhy Clips takes as a video: what may be uploaded, and what the folder picker offers. ffmpeg reads
+# all of them, so the list is wider than the ones a browser knows by name (a .mkv or a .ts from a download often
+# has no MIME type at all, which is why the page is told this list rather than guessing).
+VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".ts", ".flv", ".avi", ".mpg", ".mpeg",
+              ".wmv", ".m2ts", ".mts", ".ogv", ".3gp", ".vob"}
+
 # ---------------------------------------------------------------- when YouTube refuses this server
 # YouTube sometimes refuses a server's downloads altogether ("sign in to confirm you're not a bot"). It is a
 # refusal of the server, not of one video, so once it happens YouTube links are turned away at once for a few
 # minutes, with a clear message, instead of each one waiting to fail. Then the next link simply tries again.
 YT_PAUSE = 600
 _yt_refused_until = 0.0
-YT_BLOCKED = ("YouTube isn't letting Anhy Clips download videos right now. Upload the video file instead, or use a "
-              "Twitch or Kick link. YouTube links will be tried again in a few minutes.")
+_YT_AGAIN = "YouTube links will be tried again in a few minutes."
+YT_BLOCKED = ("YouTube isn't letting Anhy Clips download videos right now. Upload the video file instead, pick a video "
+              "that is already in a folder on this computer (From a folder), or use a Twitch or Kick link. " + _YT_AGAIN)
+# the same thing said to someone who wanted to record a stream: there is no file to pick for a stream that never ran
+YT_BLOCKED_LIVE = ("YouTube isn't letting Anhy Clips record YouTube streams right now. Twitch and Kick streams still "
+                   "work. " + _YT_AGAIN)
 _BOT_CHECK = re.compile(r"not a bot|confirm you.?re not|sign in to confirm(?! your age)", re.I)
 
 

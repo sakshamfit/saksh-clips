@@ -219,6 +219,13 @@ MAX_CREATORS = int(_limit("ANHY_MAX_CREATORS"))               # creators one acc
 ALLOWED_SITES = tuple(s.strip().lower() for s in env(
     "ANHY_ALLOWED_SITES", "youtube.com,youtu.be,twitch.tv,kick.com").split(",") if s.strip())
 
+# A video that is already in a folder on this computer can be clipped from there: no download, no upload (see
+# anhy/local.py). Only the owner of this computer, or the admin of a server, may look through its folders.
+# ANHY_LOCAL_PICK=0 turns it off. ANHY_LOCAL_FOLDERS adds folders to the picker's own list, separated by
+# semicolons (a path may contain a comma, so a semicolon is the separator).
+LOCAL_PICK = env("ANHY_LOCAL_PICK", "1") != "0"
+LOCAL_FOLDERS = [p.strip().strip('"') for p in (env("ANHY_LOCAL_FOLDERS") or "").split(";") if p.strip()]
+
 # ---------------------------------------------------------------- AI (bring your own key: see anhy/ai.py)
 # These are the starting values. Whatever is saved from the dashboard (Settings, AI) is used instead.
 AI_PROVIDER = env("ANHY_AI_PROVIDER", "arena").strip().lower()  # arena, gemini, openai, xai, groq, openrouter, anthropic, ollama, custom
