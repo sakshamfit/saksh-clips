@@ -60,6 +60,17 @@ Two things are worth knowing about the Buffer route:
   post is sent to Buffer as "share now". Buffer's own queue and posting schedule for that channel are not used,
   and Buffer's weekly posting limits still apply: if a channel is at its limit, Buffer refuses the post and it is
   retried three times before it is marked failed.
+- **"Posted" means the network has it.** Buffer takes a post first and publishes it afterwards, and it answers
+  "taken" even when it later refuses the post. So a Buffer post stays **Sent to Buffer** in the queue until Buffer
+  says it is sent, and Anhy Clips asks Buffer again every 20 minutes (and as soon as you press **Check**) until it
+  is sent or Buffer gives the reason. Nothing is called posted on Buffer's promise alone.
+- **Instagram needs to be told what it is.** Buffer refuses an Instagram post that does not say it is a Reel and
+  whether it also goes to the feed; Anhy Clips sends both. Facebook Reels get their type too, and YouTube gets a
+  title and category. If a post still fails, the message says which of these it was.
+- **When it is not posting, ask it.** Settings, Connected apps has **Why isn't it posting?** next to Buffer. It
+  goes through every step a clip takes: the sign-in, the channels (and whether Buffer has disconnected or locked
+  one), the public https address Buffer fetches from, the Reels setting, and whether Buffer takes a post at all. It
+  posts nothing to the networks (its one test post goes to X, when there is one, and is removed again).
 - **View counts stay blank.** Buffer only reports a post's numbers to a personal API key, and not straight away,
   so posts made through Buffer show no views in the overview. The same clip posted through a direct YouTube or
   Instagram connection does.

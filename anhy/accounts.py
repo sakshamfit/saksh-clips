@@ -620,15 +620,19 @@ BUF_ORGS = "query { account { organizations { id name } } }"
 BUF_CHANNELS = """query Channels($org: OrganizationId!) { channels(input: {organizationId: $org}) {
  id name service organizationId type isDisconnected isLocked isQueuePaused externalLink } }"""
 BUF_POST = """mutation PostClip($input: CreatePostInput!) { createPost(input: $input) {
+ __typename
  ... on PostActionSuccess { post { id status dueAt externalLink } }
  ... on MutationError { message } } }"""
+# One post, by Buffer's id: what became of it. A post left in the queue is never seen again otherwise.
+BUF_ONE = """query OnePost($id: PostId!) { post(input: {id: $id}) {
+ status dueAt sentAt externalLink error { message supportUrl } } }"""
 
 BUF_SERVICES = {"instagram": "Instagram", "tiktok": "TikTok", "youtube": "YouTube", "twitter": "X",
                 "facebook": "Facebook", "linkedin": "LinkedIn", "pinterest": "Pinterest", "threads": "Threads",
                 "bluesky": "Bluesky", "mastodon": "Mastodon", "google": "Google Business", "substack": "Substack"}
 # The longest post each network takes. Buffer refuses one that is longer, so the caption is cut to fit instead.
 BUF_TEXT_MAX = {"twitter": 280, "bluesky": 300, "threads": 500, "mastodon": 500}
-BUF_TEXT_DEFAULT = 1500
+BUF_TEXT_DEFAULT = 2200  # Instagram and TikTok take 2200; the rest are cut shorter by BUF_TEXT_MAX
 BUF_LINK_HOURS = 6      # how long a clip's address stays good: the post goes out at once, but a long video takes a while
 
 
@@ -815,20 +819,28 @@ def _buffer_text(text: str, service: str) -> str:
 
 
 def _buffer_meta(acc, title: str, privacy: str) -> dict:
-    """What a network needs on top of the video: YouTube a title and a category, Instagram that it is a Reel."""
-    if acc.get("service") == "youtube":
+    """What the network needs on top of the video. Buffer checks these and turns the whole post down without them:
+    Instagram needs the kind of post (post, story or reel) and whether it also goes to the feed; YouTube needs a
+    title and a category. Facebook takes a Reel the same way."""
+    svc = acc.get("service")
+    if svc == "youtube":
         return {"youtube": {"title": re.sub(r"[<>]", "", title)[:100] or "Clip", "categoryId": "20",   # Gaming, as elsewhere
                             "privacy": privacy if privacy in ("public", "unlisted", "private") else "public",
                             "madeForKids": False}}
-    if acc.get("service") == "instagram":
+    if svc == "instagram":
         return {"instagram": {"type": "reel", "shouldShareToFeed": True}}
+    if svc == "facebook":
+        return {"facebook": {"type": "reel"}}
     return {}
 
 
 def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "", privacy: str = "public"):
     """Send one clip to one Buffer channel, to go out at once. (Buffer's post id, its link on the network if it has
     one yet.) Buffer fetches the clip from a signed link here, which is why the post is sent now rather than left
-    in Buffer's queue: a queued post can go out days later, long after the link has expired."""
+    in Buffer's queue: a queued post can go out days later, long after the link has expired.
+
+    Every refusal is read back, because Buffer answers 200 even when it took nothing. The usual ones are told apart
+    and said in plain words, so the post queue says what to do rather than "Buffer failed"."""
     if not acc.get("channel"):
         raise RuntimeError("That Buffer channel is not connected any more. Press Refresh channels.")
     if not job_id:
@@ -838,19 +850,155 @@ def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "",
                            "set ANHY_PUBLIC_URL to your domain (see DEPLOY.md).")
     if not path.is_file():
         raise RuntimeError("The clip's file is not on this server any more.")
+    link = clip_link(job_id, path.name, seconds=BUF_LINK_HOURS * 3600)
     body = {"text": _buffer_text(text, acc.get("service", "")), "channelId": acc["channel"],
             "schedulingType": "automatic", "mode": "shareNow",
-            "assets": [{"video": {"url": clip_link(job_id, path.name, seconds=BUF_LINK_HOURS * 3600),
-                                  "metadata": {"thumbnailOffset": 1000}}}]}
+            "assets": [{"video": {"url": link, "metadata": {"thumbnailOffset": 1000}}}]}
     meta = _buffer_meta(acc, title, privacy)
     if meta:
         body["metadata"] = meta
-    out = _buf(BUF_POST, {"input": body}, f"Posting to {acc.get('name') or 'the channel'} on Buffer").get("createPost") or {}
-    if out.get("message"):
-        raise RuntimeError(f"Buffer did not take the post: {str(out['message'])[:200]}")
+    where = acc.get("name") or "the channel"
+    out = _buf(BUF_POST, {"input": body}, f"Posting to {where} on Buffer").get("createPost") or {}
     post = out.get("post") if isinstance(out.get("post"), dict) else {}
+    if out.get("message"):
+        raise RuntimeError(_buf_refusal(str(out["message"]), acc))
     if not post.get("id"):
         raise RuntimeError("Buffer did not say which post it made. Look in the channel's queue in Buffer.")
     if post.get("status") == "error":
         raise RuntimeError("Buffer could not publish this. Open the channel in Buffer to see why.")
     return str(post["id"]), str(post.get("externalLink") or "")
+
+
+def _buf_refusal(message: str, acc) -> str:
+    """Buffer's own words when it refuses a post, plus the thing to do about the ones that are easy to get wrong."""
+    m = message[:300]
+    low = message.lower()
+    if "instagram" in low and "type" in low:
+        return ("Buffer turned the Instagram post down: Buffer needs to be told the post is a Reel and that it "
+                "goes to the feed as well, and it was not. Update Anhy Clips, then press Retry.")
+    if "instagram" in low and ("aspect" in low or "ratio" in low or "size" in low or "video" in low):
+        return f"Buffer turned the Instagram post down: {m} Instagram Reels have to be between 3 seconds and 15 minutes long."
+    if ("fetch" in low or "download" in low or "reachable" in low or "dimensions" in low or "404" in low
+            or "not found" in low):
+        return (f"Buffer could not fetch the clip from this server ({m}). Buffer downloads the clip itself, so "
+                f"ANHY_PUBLIC_URL has to be a public https address that reaches Anhy Clips, and the clip has to still "
+                f"be there: the link is only good for {BUF_LINK_HOURS} hours. Open {config.PUBLIC_URL}/healthz from "
+                f"another network to check, then press Retry.")
+    if "thumbnail" in low:
+        return f"Buffer could not fetch the clip's thumbnail ({m}). Press Retry; if it keeps happening, report it."
+    if "limit" in low or "too many" in low:
+        return (f"Buffer refused the post: {m} This channel is at its posting limit; it goes out again when the "
+                f"limit allows, or press Retry tomorrow.")
+    if "timed out" in low or "too long" in low:
+        return (f"Buffer gave up fetching the clip ({m}). If the site is behind Cloudflare, its 100 MB request limit "
+                f"and its bot protection can stop Buffer; check the clip opens in a private window.")
+    if "text" in low and ("long" in low or "limit" in low or "exceed" in low):
+        return f"Buffer refused the caption: {m} Shorten the clip's description, then press Retry."
+    return f"Buffer did not take the post: {m}"
+
+
+def buffer_post_state(post_id: str) -> dict:
+    """What became of one Buffer post: {status, url, error}. A post is only posted once Buffer says 'sent': anywhere
+    else it may still go out, or it may have been turned down after Buffer took it."""
+    got = _buf(BUF_ONE, {"id": post_id}, "Reading the Buffer post") or {}
+    post = got.get("post") if isinstance(got.get("post"), dict) else {}
+    err = post.get("error") if isinstance(post.get("error"), dict) else {}
+    state = str(post.get("status") or "").lower()
+    why = str(err.get("message") or "")[:300]
+    if state == "error":
+        why = why or "Buffer could not publish it; open the channel in Buffer to see why."
+    return {"status": state, "url": str(post.get("externalLink") or ""),
+            "sent_at": post.get("sentAt"), "error": why}
+
+
+BUF_DELETE = """mutation DeleteOne($id: PostId!) { deletePost(input: {id: $id}) {
+ __typename
+ ... on PostActionSuccess { post { id } }
+ ... on MutationError { message } } }"""
+
+
+def buffer_diagnose() -> dict:
+    """Go through what happens when a clip is posted through Buffer, and say where it stops.
+
+    Buffer accepts a post and only later refuses it, so "it did not post" almost always means one of a short list:
+    the sign-in, a channel that is disconnected or locked in Buffer, Buffer's own posting limit, a caption too long
+    for the network, or a clip that Buffer cannot fetch from this address. This checks each in turn without posting
+    anything: the test post is only made for a channel that takes no text (X) or, when there is none, it is read
+    back and deleted again straight away."""
+    out = {"steps": [], "problem": "", "fix": ""}
+
+    def step(name, ok, detail=""):
+        out["steps"].append({"name": name, "ok": bool(ok), "detail": str(detail)[:300]})
+        return ok
+
+    if not buffer_connected():
+        step("Buffer is connected", False, "No Buffer sign-in was found. Connect Buffer with an API key in Settings.")
+        out["problem"], out["fix"] = "Buffer is not connected.", "Settings, Connected apps: paste a Buffer API key."
+        return out
+    cred = _buffer_cred()
+    step("Buffer is connected", True, "An API key." if cred.get("kind") != "oauth" else "Signed in with Buffer.")
+    chans = _buffer_channels()
+    step("Buffer answered the sign-in", bool(chans), f"{len(chans)} channel(s) in this Buffer account.")
+    if not chans:
+        out["problem"] = "Buffer has no channels."
+        out["fix"] = "Connect Instagram (or another channel) in Buffer itself, then press Refresh channels here."
+        return out
+    bad = [c for c in chans if c.get("isDisconnected") or c.get("isLocked")]
+    step("Every Buffer channel is usable", not bad,
+         "; ".join(f"{c.get('name')}: " + ("disconnected" if c.get("isDisconnected") else "locked by the Buffer plan")
+                   for c in bad) or "All of them can post.")
+    usable = [c for c in chans if not (c.get("isDisconnected") or c.get("isLocked"))]
+    if not usable:
+        out["problem"] = "Every channel in Buffer is disconnected or locked."
+        out["fix"] = "Reconnect them in Buffer, or raise the Buffer plan so the channels are not locked."
+        return out
+
+    # Where Buffer fetches clips from, and whether that address is the one this server answers on.
+    addr = config.PUBLIC_URL
+    https_ok = addr.startswith("https://")
+    step("This site has a public https address", https_ok, addr + (" (anything else cannot be fetched by Buffer)" if not https_ok else ""))
+    key = _link_key()
+    step("Buffers on this server sign clip links", bool(key), f"{len(key)} bytes of signing key.")
+    if not https_ok:
+        out["problem"] = "Buffer cannot fetch clips: this site's address is not a public https address."
+        out["fix"] = ("Set ANHY_PUBLIC_URL to the https address of this server (see DEPLOY.md) and start Anhy Clips "
+                      "again. Until then, post through a direct Instagram or YouTube connection instead.")
+        return out
+
+    ig = [c for c in usable if str(c.get("service")) == "instagram"]
+    meta = _buffer_meta({"service": "instagram"}, "A clip title", "public")
+    step("Instagram posts are told they are Reels", meta.get("instagram", {}).get("type") == "reel"
+         and meta["instagram"].get("shouldShareToFeed") is True, str(meta))
+    if ig:
+        step("An Instagram channel is connected in Buffer", True, ", ".join(str(c.get("name")) for c in ig))
+
+    # The one real answer: a post Buffer will take without text, made and removed again.
+    quiet = next((c for c in usable if str(c.get("service")) in ("twitter", "bluesky", "mastodon")), None)
+    if quiet:
+        try:
+            made = _buf(BUF_POST, {"input": {"text": "Anhy Clips connection check", "channelId": quiet["id"],
+                                             "schedulingType": "automatic", "mode": "addToQueue"}},
+                        "Checking a post on Buffer").get("createPost") or {}
+            if made.get("message"):
+                step("Buffer takes a post", False, made["message"])
+                out["problem"] = f"Buffer refused a test post: {str(made['message'])[:200]}"
+                out["fix"] = "That is Buffer's own limit or setting, not Anhy Clips. Open Buffer to see what it says."
+                return out
+            pid = (made.get("post") or {}).get("id")
+            try:
+                _buf(BUF_DELETE, {"id": pid}, "Removing the test post")
+            except Exception:  # noqa: BLE001 - the check itself worked; a leftover draft is harmless
+                pass
+            step("Buffer takes a post", True, "A test post was made and removed again.")
+        except Exception as e:  # noqa: BLE001
+            step("Buffer takes a post", False, str(e)[:300])
+            out["problem"] = str(e)[:300]
+            out["fix"] = "Check the API key's permissions in Buffer (it needs posting), then connect Buffer again."
+            return out
+    else:
+        step("Buffer takes a post", True, "Not tested: a test post here would be visible. Add X to Buffer to check.")
+
+    out["problem"] = ""
+    out["fix"] = ("Buffer looks ready. If a clip still fails, the message on the post says why; press Check on it in "
+                  "the post queue to ask Buffer again.")
+    return out

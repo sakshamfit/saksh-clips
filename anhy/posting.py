@@ -19,7 +19,7 @@ except ValueError:
 def _mine() -> list:
     u = ctx.uid()
     return [p for p in _posts if p.get("user") == u]
-OPEN = ("scheduled", "posting")
+OPEN = ("scheduled", "posting", "sent")   # "sent": Buffer has taken it and has not published it yet
 
 
 def _save():
@@ -125,6 +125,17 @@ def _post(p):
             rid, url = accounts.tiktok_upload(acc, path, f"{title}\n\n{cap}", creator["privacy"])
         elif acc["platform"] == "buffer":
             rid, url = accounts.buffer_upload(acc, path, f"{title}\n\n{cap}", title, job["id"], creator["privacy"])
+            # Buffer taking the post is not the same as the network having it. It stays "sent" (shown as "Sent to
+            # Buffer") until Buffer says it went out, or says why it did not: _buffer_settle keeps asking.
+            sent = accounts.buffer_post_state(rid)
+            if sent["status"] == "error":
+                raise RuntimeError(sent["error"] or "Buffer could not publish this.")
+            url = url or sent["url"]
+            p.update(status="sent", posted_at=time.time(), remote_id=rid, url=url, error=None)
+            _save()
+            _mirror(p)
+            creators.log(p["creator"], f"Sent to Buffer for {acc['name']}: {title}")
+            return
         else:
             raise RuntimeError("That kind of account is no longer supported.")
         p.update(status="posted", posted_at=time.time(), remote_id=rid, url=url, error=None)
@@ -158,6 +169,52 @@ def _run():
                     _post(p)
             except Exception:  # noqa: BLE001
                 pass
+        try:
+            _buffer_settle()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+BUFFER_CHECK_MIN = 20      # how often Buffer is asked what became of a post it took
+BUFFER_GIVE_UP_HOURS = 6   # after this, a post Buffer has not sent is called out rather than waited on
+
+
+def _buffer_settle():
+    """Ask Buffer what became of the posts it took and has not sent yet. Buffer publishes by itself, so the queue
+    has to look: without this a post Buffer quietly dropped stayed on screen as posted for ever."""
+    waiting = [p for p in list(_posts) if p["status"] == "sent" and p.get("user") and p.get("remote_id")]
+    users = {p["user"] for p in waiting}
+    for uid in users:
+        mine = [p for p in waiting if p["user"] == uid]
+        if any(time.time() - p.get("checked", 0) < BUFFER_CHECK_MIN * 60 for p in mine):
+            continue
+        with ctx.as_user(uid):
+            for p in mine:
+                try:
+                    acc = accounts.get(p["account"])
+                    if not acc or acc.get("platform") != "buffer":
+                        p.update(status="failed", error="That Buffer channel was disconnected before the post went out.")
+                        continue
+                    got = accounts.buffer_post_state(p["remote_id"])
+                except Exception:  # noqa: BLE001 - Buffer unreachable: ask again later
+                    p["checked"] = time.time()
+                    continue
+                p["checked"] = time.time()
+                st = got["status"]
+                if st == "sent":
+                    p.update(status="posted", posted_at=time.time(), url=got["url"] or p.get("url") or "", error=None)
+                    creators.log(p["creator"], f"Posted to {p['account_name']} through Buffer: {p['title']}")
+                elif st in ("error", "draft") or (st in ("scheduled", "sending") and
+                                                  time.time() - (p.get("posted_at") or time.time()) > BUFFER_GIVE_UP_HOURS * 3600):
+                    p["tries"] += 1
+                    msg = got["error"] or ("Buffer has not sent this post." if st in ("scheduled", "sending")
+                                           else "Buffer did not publish this post; open the channel in Buffer to see why.")
+                    p.update(status="failed", error=msg[:300])
+                    creators.log(p["creator"], f"Post failed on {p['account_name']}: {p['error']}")
+                    alerts.notify(f"post failed on {p['account_name']} ({p['title']}): {p['error'][:200]}", kind="post")
+        _save()
+        for p in mine:
+            _mirror(p)
 
 
 def _stats_for(recent):
@@ -203,9 +260,35 @@ def retry(pid):
         p = next((p for p in _mine() if p["id"] == pid), None)
         if not p or p["status"] not in ("failed", "cancelled"):
             raise ValueError("Only failed or cancelled posts can be retried.")
-        p.update(status="scheduled", due_at=time.time(), tries=0, error=None)
+        # A retry is a fresh post: the old one on Buffer (if there was one) is not asked about again, and is never
+        # sent twice. A post Buffer has already taken and sent cannot be retried, so it cannot go out twice either.
+        p.update(status="scheduled", due_at=time.time(), tries=0, error=None, remote_id="", checked=0, url="")
         _save()
     _mirror(p)
+
+
+def check(pid) -> dict:
+    """Ask the network (Buffer) what became of a post right now, instead of waiting for the next look. The answer is
+    saved on the post, so the queue shows it straight away. A post still on its way back says so."""
+    with _lock:
+        p = next((p for p in _mine() if p["id"] == pid), None)
+        if not p or not p.get("remote_id"):
+            raise ValueError("That post has not been sent anywhere yet.")
+        if p["platform"] != "buffer":
+            raise ValueError("Only posts sent through Buffer can be checked; the other networks report at once.")
+        if p["status"] not in ("sent", "posted", "failed"):
+            raise ValueError("That post is still on its way.")
+    got = accounts.buffer_post_state(p["remote_id"])
+    with _lock:
+        st = got["status"]
+        if st == "sent":
+            p.update(status="posted", posted_at=time.time(), url=got["url"] or p.get("url") or "", error=None)
+        elif st in ("error", "draft"):
+            p.update(status="failed", error=(got["error"] or "Buffer did not publish this post.")[:300])
+        p["checked"] = time.time()
+        _save()
+    _mirror(p)
+    return {"status": p["status"], "error": p.get("error") or "", "url": p.get("url") or ""}
 
 
 def overview() -> dict:
