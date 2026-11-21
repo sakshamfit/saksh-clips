@@ -33,3 +33,4 @@ venv/
 
 # ---- local binaries (ffmpeg/ffprobe fetched for this machine)
 /bin/
+/ffmpeg/
