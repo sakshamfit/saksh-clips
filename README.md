@@ -5,14 +5,16 @@ Based on [PeakCut](https://github.com/haziqahmedqasmi/peakcut) by PeakCut contri
 Turn long videos and live streams into captioned vertical clips, ready to post. Free and open source: run it on
 your own computer or server, with your own AI key.
 
-Paste a YouTube, Twitch or Kick link (or upload a file) and Anhy Clips finds the moments worth clipping, cuts them to
-9:16, adds word-by-word captions and a hook, and can post them to your connected accounts. It can also record a
-creator's live stream and clip the highlights while the stream is still running.
+Paste a YouTube, Twitch or Kick link (or upload a file), choose how the clips should look, and Anhy Clips finds the
+moments worth clipping, cuts them to 9:16, adds word-by-word captions and a hook, and can post them to your
+connected accounts. It can also record a creator's live stream and clip the highlights while the stream is still
+running.
 
 ## What it does
 
-- **Clips from any video.** Transcribes the audio, asks an AI which moments would hold a stranger's attention, and
-  renders each one with captions in one of three styles.
+- **Clips from any video.** You choose the framing and the caption style before anything is made, with a preview
+  drawn from the video itself; then it transcribes the audio, asks an AI which moments would hold a stranger's
+  attention, and renders each one in that style.
 - **Live clipping.** Records a stream into a rolling buffer and clips as it happens, using loudness, chat activity
   and the transcript.
 - **Workspaces per creator.** Channels, clip settings, posting rules and an activity log for each creator you clip.

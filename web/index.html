@@ -405,6 +405,43 @@ img.av{object-fit:cover}
 .range>svg{width:14px;height:14px;color:var(--faint);flex:none}
 @media (max-width:640px){.og{grid-template-columns:1fr}.nsteps{grid-template-columns:1fr}}
 
+/* ---------- choosing the framing and the caption style before any clipping starts */
+dialog.pickdlg{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:var(--r-lg);padding:0;width:720px;max-width:calc(100vw - 32px)}
+.pd{padding:22px 24px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 40px);overflow:auto}
+.pd h2{font-size:18px;font-weight:600;color:var(--brand-ink)}
+.pd .pd-sub{font-size:13px;color:var(--dim);margin-top:-8px}
+.pd h3{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pd-grid.caps{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pd-opt{display:flex;flex-direction:column;gap:7px;padding:6px 6px 9px;border:0;border-radius:11px;background:var(--muted);color:var(--dim);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:background-color .15s ease,color .15s ease}
+.pd-opt:hover,.pd-opt:focus-visible{background:#EDE3DB;color:var(--text)}
+.pd-opt[aria-pressed=true]{background:var(--brand-soft);color:var(--brand-ink)}
+.pd-opt .cap-prev{width:100%;font-size:13px}
+.pd-opt .cap-prev b{color:var(--brand)}
+.pd-opt[data-style=bounce] .cap-prev b{color:#3EE8FF}
+.pd-opt[data-style=hype] .cap-prev b{color:#5B5BFF}
+.pd-opt[data-style=clean] .cap-prev b{color:#6BD7FF}
+.pd-opt[aria-pressed=true] .lay-prev,.pd-opt[aria-pressed=true] .cap-prev{outline:2px solid var(--brand)}
+.pd-shot{position:relative;display:block;width:100%;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#1E1612}
+.pd-shot canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pd-shot .noimg{position:absolute;inset:0;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;color:#7A5F50;font-size:11px;font-weight:500;padding:8px;text-align:center}
+.pd-shot .noimg svg{width:18px;height:18px}
+.pd-cap{position:absolute;left:0;right:0;bottom:14%;text-align:center;font-size:11px;line-height:1.1;color:#fff;-webkit-text-stroke:1.6px #000;paint-order:stroke fill;white-space:nowrap}
+.pd-cap b{font-weight:inherit}
+.pd-hook{position:absolute;left:8%;right:8%;top:9%;text-align:center;font-size:9px;line-height:1.15;font-weight:800;color:#14100E;background:#fff;border-radius:5px;padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bufstep{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)}
+.bufstep i{flex:none;width:18px;height:18px;display:grid;place-items:center;margin-top:1px}
+.bufstep i svg{width:16px;height:16px}
+.bufstep.ok i{color:#1F7A4D}.bufstep.bad i{color:#C53030}
+.bufstep b{display:block;font-size:13px;font-weight:600;color:var(--text)}
+.bufstep em{display:block;font-style:normal;font-size:12px;color:var(--dim)}
+.pd-look{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;align-items:center;background:var(--muted);border-radius:12px;padding:12px}
+.pd-look .pd-shot{width:120px}
+.pd-foot{display:flex;gap:8px;align-items:center;justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px}
+.pd-foot .grow{flex:1}
+.pd-foot .hint{font-size:12px;color:var(--faint)}
+@media (max-width:640px){.pd-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pd-grid.caps{grid-template-columns:repeat(3,minmax(0,1fr))}.pd-look{grid-template-columns:90px minmax(0,1fr)}.pd-look .pd-shot{width:90px}}
+
 /* ---------- home blocks */
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}
 .tile{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column}
@@ -832,6 +869,7 @@ dialog[open]{animation:fadein .16s ease}
   </main>
 </div>
 <dialog id="clipdlg"></dialog>
+<dialog id="pickdlg" class="pickdlg"></dialog>
 <dialog id="formdlg"></dialog>
 <input type="file" id="file" accept="video/*" multiple hidden>
 <div id="toasts" role="status" aria-live="polite"></div>
@@ -1379,8 +1417,9 @@ function drawAdd(variant) {
       </div></div>
       <div class="ob"><div class="ot cap-head"><span id="o_style_label">Caption style</span>
         <label><input type="checkbox" id="o_captions" data-caption-toggle ${c?.captions === false ? "" : "checked"}>Generate captions</label></div>
+      <p class="sub" style="margin:0 0 2px;font-size:12px">Leave these as they are to be asked before each batch, with a preview.</p>
         ${choice("o_style", Object.entries(S.status.styles).map(([k, v]) => ({v:k, label:v, prev:capPrev(k)})), c?.style ?? "bounce", c?.captions === false)}</div>
-      <div class="ob"><div class="ot">Layout</div>${choice("o_layout", Object.entries(S.status.layouts).map(([k, v]) => ({v:k, label:LAYOUT_SHORT[k] || v, title:v, prev:`<span class="lay-prev ${esc(k)}"><span class="ph"><i></i></span></span>`})), c?.layout ?? "blur")}</div>
+      <div class="ob"><div class="ot cap-head"><span>Layout</span><em class="sub" style="font-style:normal;font-weight:500">Also asked when you press Make clips</em></div>${choice("o_layout", Object.entries(S.status.layouts).map(([k, v]) => ({v:k, label:LAYOUT_SHORT[k] || v, title:v, prev:`<span class="lay-prev ${esc(k)}"><span class="ph"><i></i></span></span>`})), c?.layout ?? "blur")}</div>
       <div class="ob"><div class="ot">Video quality</div><input type="hidden" id="o_quality" value="720"><div class="seg" role="group" aria-label="Video quality">
         <button type="button" data-seg="o_quality" data-v="720" aria-pressed="true">720p<small>Fast</small></button>
         <button type="button" data-seg="o_quality" data-v="1080" aria-pressed="false">1080p<small>Sharper, about 2x slower</small></button></div></div>
@@ -1630,6 +1669,198 @@ function sendFile(f, who, options) {
     x.send(fd);
   });
 }
+/* ---------- before any clipping: choose the framing and the caption style, and see them on the video.
+   The chooser opens when Make clips is pressed, filled in from the creator (or the last choice), with a preview of
+   every layout drawn from the video's own picture. Clipping only starts when Start clipping is pressed, so nothing
+   is spent before the choice is made. */
+const PICK = {open: false, resolve: null, opts: null, target: null, look: {}};
+const LAYOUT_WHY = {blur: "The whole picture, with a blurred copy filling the rest.", zoom: "The picture larger, the edges blurred away.",
+                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner."};
+
+function pickDefaults(A) {
+  const c = creator() || S.creators.find(x => x.id === targetCreator());
+  const last = S.lastPick || {};
+  const fallback = {style: c?.style ?? "bounce", layout: c?.layout ?? "blur", captions: c?.captions !== false,
+                    max_clips: c?.max_clips ?? 6, min_len: c?.min_len ?? 15, max_len: c?.max_len ?? 60};
+  return {...fallback, ...last};   // what was chosen last time wins: it is usually the same again
+}
+
+/* The picture the previews are drawn from: the biggest video already added, either a link's own thumbnail or a
+   frame of an uploaded file. Nothing is fetched from another site (the page may not do that). */
+function pickSource(A) {
+  const f = A.files.find(x => x.file);
+  if (f) return {kind: "file", file: f.file};
+  const l = A.links.find(x => x.state === "ok" && x.info?.thumb);
+  if (l) return {kind: "img", src: l.info.thumb};
+  return null;
+}
+
+function drawPickPreviews(src) {
+  const dlg = $("#pickdlg"); if (!dlg) return;
+  const canvases = [...dlg.querySelectorAll("#p_canvas")];
+  if (!src) { canvases.forEach(c => c.getContext("2d").clearRect(0, 0, c.width, c.height)); return; }
+  const paint = img => {
+    PICK.look.img = img;
+    canvases.forEach(c => paintLayout(c, img, PICK.opts?.layout || "blur"));
+    drawLook();
+  };
+  if (src.kind === "img") {
+    const im = new Image();
+    im.onload = () => paint(im);
+    im.src = src.src;
+    return;
+  }
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = URL.createObjectURL(src.file);
+  const done = () => { const c = document.createElement("canvas"); c.width = v.videoWidth || 720; c.height = v.videoHeight || 1280;
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); URL.revokeObjectURL(v.src); paint(c); };
+  v.onloadeddata = () => { try { v.currentTime = Math.min(1.5, (v.duration || 4) / 3); } catch { done(); } };
+  v.onseeked = done;
+  v.onerror = () => { URL.revokeObjectURL(v.src); canvases.forEach(c => c.getContext("2d").clearRect(0, 0, c.width, c.height)); };
+}
+
+/* One preview canvas: the video placed the way that layout will place it, at 9:16, then the hook and a caption. */
+function paintLayout(cv, img, layout) {
+  const W = cv.width, H = cv.height, g = cv.getContext("2d");
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "#1E1612"; g.fillRect(0, 0, W, H);
+  const sw = img.width || 16, sh = img.height || 9, vertical = sh >= sw;
+  const drawIn = (dw, dh) => g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  const cover = () => { const s = Math.max(W / sw, H / sh); drawIn(sw * s, sh * s); };
+  if (layout === "crop" || layout === "gameplay") {
+    if (layout === "gameplay" && !vertical) {
+      cover();
+      const pw = W * 0.34, ph = pw * 0.75;         // the webcam in the corner
+      g.save(); g.globalAlpha = 0.95; g.fillStyle = "#2A1D16"; g.fillRect(W - pw - W * 0.03, H * 0.03, pw, ph);
+      g.drawImage(img, 0, 0, sw, sh * 0.5, W - pw - W * 0.03, H * 0.03, pw, ph); g.restore();
+    } else cover();
+  } else {
+    g.filter = "blur(5px) brightness(0.62) saturate(1.15)";   // the blurred fill behind
+    cover(); g.filter = "none";
+    const fgH = layout === "zoom" ? H * (vertical ? 1 : 0.52) : Math.min(H, W * sh / sw);
+    const fgW = fgH * sw / sh;
+    g.drawImage(img, (W - fgW) / 2, (H - fgH) / 2, fgW, fgH);
+  }
+  const top = layout === "crop" || layout === "gameplay" ? H * 0.1 : H * 0.055;
+  g.fillStyle = "#fff"; g.globalAlpha = 0.93;
+  const bw = W * 0.74, bh = H * 0.042, bx = (W - bw) / 2;
+  g.beginPath(); g.roundRect ? g.roundRect(bx, top, bw, bh, bh * 0.4) : g.rect(bx, top, bw, bh); g.fill();
+  g.globalAlpha = 1;
+  if (layout === "gameplay" && !vertical) {                      // the hook goes under the webcam corner
+    g.fillStyle = "#fff"; g.globalAlpha = 0.93;
+    const y2 = H * 0.03 + W * 0.34 * 0.75 + H * 0.02;
+    g.beginPath(); g.roundRect ? g.roundRect(bx, y2, bw, bh, bh * 0.4) : g.rect(bx, y2, bw, bh); g.fill();
+    g.globalAlpha = 1;
+  }
+}
+
+/* The chosen framing and caption style, drawn big on the video's own picture, with the hook and a caption line the
+   way the clip will have them. */
+function drawLook() {
+  const cv = $("#pickdlg")?.querySelector("#p_canvas"); if (!cv) return;
+  const img = PICK.look.img;
+  if (!img) return;
+  const o = pickState();
+  paintLayout(cv, img, o.layout);
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const look = CAP_LOOK[o.style] || CAP_LOOK.bounce, up = look.up !== false;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `800 ${Math.round(W * 0.075)}px 'Poppins', sans-serif`;      // the hook in its white box
+  g.fillStyle = "#14100E";
+  g.fillText("this is the part worth watching", W / 2, (o.layout === "crop" || o.layout === "gameplay") ? H * 0.1 + H * 0.042 / 2 : H * 0.055 + H * 0.042 / 2);
+  if (o.captions === false) return;
+  const size = Math.round(W * (o.style === "hype" ? 0.2 : o.style === "clean" ? 0.15 : 0.17));
+  g.font = `${o.style === "hype" ? "400" : "800"} ${size}px ${o.style === "hype" ? "Anton" : "Poppins"}, sans-serif`;
+  g.lineWidth = Math.max(3, size * 0.14); g.strokeStyle = "#000";
+  const y = H * 0.84, one = up ? "THIS" : "this", two = up ? "IS IT" : "is it";
+  const w1 = g.measureText(one + " ").width, total = w1 + g.measureText(two).width, x = (W - total) / 2;
+  g.textAlign = "left";
+  g.strokeText(one + " ", x, y); g.fillStyle = "#fff"; g.fillText(one + " ", x, y);
+  g.strokeText(two, x + w1, y); g.fillStyle = look.hl; g.fillText(two, x + w1, y);
+}
+
+function pickState() {
+  const dlg = $("#pickdlg");
+  return {style: dlg.querySelector("#p_style")?.value || "bounce", layout: dlg.querySelector("#p_layout")?.value || "blur",
+          captions: dlg.querySelector("#p_caps")?.checked !== false,
+          max_clips: Number(dlg.querySelector("#p_max")?.value) || 6};
+}
+
+function drawPick(opts, A) {
+  const dlg = $("#pickdlg");
+  const src = pickSource(A);
+  const lay = layout => `<button type="button" class="pd-opt" data-layout="${layout}" aria-pressed="${opts.layout === layout}" title="${esc(LAYOUT_WHY[layout] || "")}">
+      <span class="lay-prev ${esc(layout)}" style="height:64px"><span class="ph" style="width:36px;height:64px"><i></i></span></span>${esc(LAYOUT_SHORT[layout] || layout)}</button>`;
+  const sty = k => `<button type="button" class="pd-opt" data-style="${k}" aria-pressed="${opts.style === k}" title="${esc(S.status.styles[k] || k)}">
+      <span class="cap-prev" style="height:64px;font-family:${CAP_LOOK[k]?.font || "inherit"},sans-serif;font-weight:${CAP_LOOK[k]?.w || 400}">${CAP_LOOK[k]?.up === false ? "Clip <b>this</b>" : "CLIP <b>THIS</b>"}</span>${esc(S.status.styles[k] || k)}</button>`;
+  const n = A.files.length + A.links.filter(l => l.state === "ok").length;
+  dlg.innerHTML = `<form method="dialog" class="pd"><div>
+      <h2>Choose the look before clipping</h2>
+      <p class="pd-sub">${n === 1 ? "Pick these now, so the clips come out the way you want them the first time."
+        : `The same look is used for all ${n} videos in this batch, so nothing is made the wrong shape.`}</p></div>
+    <div><h3>Framing</h3><div class="pd-grid">${Object.keys(S.status.layouts).map(lay).join("")}</div></div>
+    <div><h3>Caption style</h3>
+      <label class="sw" style="margin-bottom:10px"><input type="checkbox" id="p_caps" ${opts.captions ? "checked" : ""}>Generate captions</label>
+      <div class="pd-grid caps">${Object.keys(S.status.styles).map(sty).join("")}</div></div>
+    <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
+      <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
+        <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status.styles[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
+        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--brand-ink);display:${opts.layout === "gameplay" ? "" : "none"}">A webcam is only found in a stream recording. Anything else fills the screen instead.</p></div></div>
+    <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
+      ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
+    <div class="pd-foot"><span class="hint">Change any of this later on each clip.</span><span class="grow"></span>
+      <button class="btn primary" value="go" id="p_go" style="order:2">${ic("scissors")}Start clipping</button>
+      <button class="btn" value="cancel" formnovalidate style="order:3">Cancel</button></div>
+    <input type="hidden" id="p_layout" value="${esc(opts.layout)}"><input type="hidden" id="p_style" value="${esc(opts.style)}"></form>`;
+  drawPickPreviews(src);
+}
+
+function openPick(A) {
+  const opts = pickDefaults(A);
+  if (PICK.open) return Promise.resolve(null);
+  PICK.open = true; PICK.opts = opts; PICK.target = A;
+  drawPick(opts, A);
+  const dlg = $("#pickdlg");
+  return new Promise(res => {
+    PICK.resolve = res;
+    dlg.onclose = () => {
+      PICK.open = false;
+      const ok = dlg.returnValue === "go";
+      const got = ok ? {...pickState(), captions: dlg.querySelector("#p_caps")?.checked !== false} : null;
+      if (ok) S.lastPick = {style: got.style, layout: got.layout, captions: got.captions, max_clips: got.max_clips};
+      PICK.opts = null; PICK.target = null; PICK.resolve = null;
+      dlg.innerHTML = "";
+      res(got);
+    };
+    dlg.returnValue = "cancel";
+    dlg.showModal();
+  });
+}
+
+/* clicks and changes inside the chooser: framing, style, captions, the number of clips */
+document.addEventListener("click", e => {
+  const dlg = $("#pickdlg"); if (!dlg || !dlg.open || !dlg.contains(e.target)) return;
+  const lay = e.target.closest("[data-layout]");
+  if (lay) {
+    dlg.querySelector("#p_layout").value = lay.dataset.layout;
+    dlg.querySelectorAll("[data-layout]").forEach(b => b.setAttribute("aria-pressed", String(b === lay)));
+    const why = dlg.querySelector(".pd-look .pd-sub"); if (why) why.textContent = LAYOUT_WHY[lay.dataset.layout] || "";
+    const now = dlg.querySelector("#p_now"); if (now) now.textContent = LAYOUT_SHORT[lay.dataset.layout] || lay.dataset.layout;
+    const warn = dlg.querySelector("#p_warn"); if (warn) warn.style.display = lay.dataset.layout === "gameplay" ? "" : "none";
+    return drawLook();
+  }
+  const sty = e.target.closest("[data-style]");
+  if (sty) {
+    dlg.querySelector("#p_style").value = sty.dataset.style;
+    dlg.querySelectorAll("[data-style]").forEach(b => b.setAttribute("aria-pressed", String(b === sty)));
+    return drawLook();
+  }
+});
+$("#pickdlg").addEventListener("change", e => {
+  if (e.target.id === "p_caps") return drawLook();
+});
+$("#pickdlg").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close("cancel"); });
+
 async function makeClips() {
   const A = att();
   if (A.busy) return;
@@ -1645,9 +1876,12 @@ async function makeClips() {
     $("#url")?.focus();
     return;
   }
+  // Nothing is made until the framing and style are chosen: the chooser shows both on the video itself.
+  const chosen = await openPick(A);
+  if (!chosen) { drawAtt(); return; }                    // cancelled: nothing was sent, nothing was spent
   A.busy = true; drawAtt();
   let started = 0, failed = 0;
-  const who = targetCreator(), opts = jobOptions();
+  const who = targetCreator(), opts = {...jobOptions(), ...chosen};
   for (const l of A.links.filter(x => x.state === "ok")) {
     l.sending = true; drawAtt();
     try { await send("/api/jobs", {url: l.url, options: opts, creator: who}); l.state = "done"; started++; }
@@ -1674,7 +1908,8 @@ function scoreCls(s) { return s >= 80 ? "s-hi" : s >= 60 ? "s-mid" : ""; }
 function postPills(c) {
   return Object.values(c.posts || {}).filter(p => p.status !== "cancelled").map(p => {
     const cls = p.status === "posted" ? "ok" : p.status === "failed" ? "bad" : "warn";
-    const txt = `${esc(p.account_name)} · ${p.status === "scheduled" ? clock(p.due_at) : p.status}`;
+    const said = p.status === "scheduled" ? clock(p.due_at) : p.status === "sent" ? "sent, waiting on Buffer" : p.status;
+    const txt = `${esc(p.account_name)} · ${said}`;
     return p.url ? `<a class="pill ${cls}" href="${esc(p.url)}" target="_blank" rel="noopener">${txt}</a>` : `<span class="pill ${cls}" title="${esc(p.error || "")}">${txt}</span>`;
   }).join("");
 }
@@ -1924,7 +2159,7 @@ function drawOverview() {
   const sum = k => o.creators.reduce((a, r) => a + r[k], 0);
   const d14 = k => (o.daily || []).reduce((a, d) => a + d[k], 0);
   const state = r => r.state === "recording" ? `<span class="pill live"><span class="dot"></span>Recording</span>` : r.state === "waiting" ? `<span class="pill warn">Waiting for live</span>` : `<span class="pill">Idle</span>`;
-  const pst = p => p.status === "posted" ? `<span class="pill ok">Posted</span>` : p.status === "failed" ? `<span class="pill bad">Failed</span>` : p.status === "posting" ? `<span class="pill warn">Posting now</span>` : `<span class="pill warn">${clock(p.due_at)}</span>`;
+  const pst = p => p.status === "posted" ? `<span class="pill ok">Posted</span>` : p.status === "failed" ? `<span class="pill bad">Failed</span>` : p.status === "posting" ? `<span class="pill warn">Posting now</span>` : p.status === "sent" ? `<span class="pill warn" title="Buffer has the post and will publish it">Sent to Buffer</span>` : `<span class="pill warn">${clock(p.due_at)}</span>`;
   const steps = nextSteps(o);
   put(box, `<div class="tiles">
       <div class="tile"><i>${ic("radio")}</i><b>${o.recording}</b><span>Recording now</span></div>
@@ -1949,7 +2184,7 @@ function drawOverview() {
         <button class="btn ${o.paused ? "primary" : ""}" data-act="pause">${ic(o.paused ? "play" : "pause")}${o.paused ? "Resume posting" : "Pause all posting"}</button></div>
       ${o.posts.length ? `<div class="scroll"><table class="stack"><tr><th>When</th><th>Clip</th><th>Creator</th><th>Account</th><th class="num">Views</th><th></th></tr>
       ${o.posts.map(p => `<tr><td data-l="Status">${pst(p)}</td><td data-l="Clip" class="c-main">${p.url ? `<a class="lnk" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)}${p.error ? `<div class="err" style="margin:2px 0 0">${esc(p.error)}</div>` : ""}</td><td data-l="Creator">${esc(p.creator_name || "None")}</td><td data-l="Account">${esc(p.account_name)}</td><td data-l="Views" class="num">${p.views ?? "–"}</td>
-        <td class="c-act" style="text-align:right">${p.status === "scheduled" ? `<button class="btn sm" data-act="pcancel" data-id="${p.id}">Cancel</button>` : p.status === "failed" ? `<button class="btn sm" data-act="pretry" data-id="${p.id}">Retry</button>` : ""}</td></tr>`).join("")}</table></div>`
+        <td class="c-act" style="text-align:right">${p.status === "scheduled" ? `<button class="btn sm" data-act="pcancel" data-id="${p.id}">Cancel</button>` : p.status === "failed" ? `<button class="btn sm" data-act="pretry" data-id="${p.id}">Retry</button>` : p.status === "sent" ? `<button class="btn sm" data-act="pcheck" data-id="${p.id}">Check</button>` : ""}</td></tr>`).join("")}</table></div>`
       : `<p class="help">Nothing queued or posted yet.</p>`}</div>`);
 }
 
@@ -2129,6 +2364,7 @@ async function drawSettings() {
       const bufferCard = () => {
         const pf = "buffer", name = "Buffer", accs = mine(pf), st = setup?.[pf], on = accs.length > 0;
         const act = (on ? `<button class="btn sm primary" data-act="bufsync">${ic("refresh")}Refresh channels</button>
+              <button class="btn sm ghost" data-act="bufcheck" title="Check every step a clip takes through Buffer, without posting anything">${ic("warn")}Why isn't it posting?</button>
               <button class="btn sm ghost" data-act="bufkey">${ic("plug")}Change key</button>`
             : `<button class="btn sm primary" data-act="bufkey">${ic("plug")}Use an API key</button>`
               + (ok[pf] ? `<a class="btn sm ghost" href="/oauth/${pf}/start">${ic("plus")}Sign in with Buffer</a>` : ""))
@@ -2140,7 +2376,15 @@ async function drawSettings() {
             <div class="row"><button class="btn primary" data-act="bufsave">${on ? "Use this key" : "Connect Buffer"}</button><button class="btn ghost" data-act="bufkey">Close</button></div></div>` : "";
         return `<div class="appcard"><span class="applogo" style="background:#168EEA">${bf}</span>
           <div class="apptx"><b>${name}</b><span>One connection for every channel in your Buffer: Instagram, TikTok, YouTube, X, LinkedIn and more.</span>${listOf(accs)}</div>
-          <div class="appact">${act}</div>${key}${S.setupOpen === pf && st ? setupPanel(pf, name, st, GUIDE[pf]) : ""}</div>`;
+          <div class="appact">${act}</div>${key}${S.bufCheck ? bufCheckHtml() : ""}${S.setupOpen === pf && st ? setupPanel(pf, name, st, GUIDE[pf]) : ""}</div>`;
+      };
+      const bufCheckHtml = () => {
+        const r = S.bufCheck;
+        const rows = (r.steps || []).map(x => `<div class="bufstep ${x.ok ? "ok" : "bad"}"><i>${x.ok ? ic("check") : ic("warn")}</i><span><b>${esc(x.name)}</b>${x.detail ? `<em>${esc(x.detail)}</em>` : ""}</span></div>`).join("");
+        return `<div class="appsetup"><h3 style="margin:0 0 8px">What happens to a clip on its way to Buffer</h3>${rows}
+          ${r.problem ? `<p class="err" style="margin:10px 0 0">${esc(r.problem)}</p>` : ""}
+          ${r.fix ? `<p class="sub" style="margin:6px 0 0">${esc(r.fix)}</p>` : ""}
+          <div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="bufcheck">${ic("refresh")}Check again</button></div></div>`;
       };
       body.innerHTML = `<section class="set-sec"><h2>Connected apps</h2><p class="help">Connect the accounts Anhy Clips posts clips to: press Connect, sign in on the platform's own page, and you're back here. Anhy Clips never sees your passwords. Buffer takes an API key instead, and brings every channel you have connected there. Then pick which accounts each creator posts to, in that creator's Setup.</p>
         <div class="apps">
@@ -2482,6 +2726,13 @@ document.addEventListener("click", async e => {
       toast(`Buffer is connected: ${r.channels} channel${r.channels === 1 ? "" : "s"} can take your clips.`, "ok");
       return drawSettings();
     }
+    if (a === "bufcheck") {
+      b.disabled = true; S.bufCheck = null;
+      try { S.bufCheck = await api("/api/accounts/buffer/check"); toast(S.bufCheck.problem ? "Buffer isn't ready: the reason is below." : "Buffer looks ready.", S.bufCheck.problem ? "bad" : "ok"); }
+      catch (e) { S.bufCheck = {steps: [], problem: e.message, fix: ""}; toast(e.message, "bad"); }
+      finally { b.disabled = false; }
+      return drawSettings();
+    }
     if (a === "bufsync") {
       b.disabled = true;
       try {
@@ -2499,7 +2750,11 @@ document.addEventListener("click", async e => {
     if (a === "csave") return void await saveCreator();
     if (a === "cdiscard") { drawCreatorForm(); return toast("Changes discarded"); }
     if (a === "pause") { await send("/api/settings", {paused:!S.overview.paused}, "PUT"); return loadOverview(); }
-    if (a === "pcancel" || a === "pretry") { await api(`/api/posts/${d.id}/${a === "pcancel" ? "cancel" : "retry"}`, {method:"POST"}); return loadOverview(); }
+    if (a === "pcancel" || a === "pretry" || a === "pcheck") {
+      await api(`/api/posts/${d.id}/${a === "pcancel" ? "cancel" : a === "pretry" ? "retry" : "check"}`, {method:"POST"});
+      if (a === "pcheck") toast("Asked Buffer what became of it. The queue is up to date now.", "ok");
+      return loadOverview();
+    }
     if (a === "ssave") { await saveSettings(); toast("Saved", "ok"); return drawSettings(); }
     if (a === "plansave") {
       const p = {}; $$("#sform [data-plan]").forEach(i => { (p[i.dataset.plan] ??= {})[i.dataset.f] = Number(i.value); });

@@ -62,7 +62,7 @@ class R:
             raise ValueError
         return self._d
 calls, uploads, tt = [], [], {"audited": False, "status": 0}
-buf = {"channels": [], "posts": [], "reject": False, "denied": False, "token_form": {}}
+buf = {"channels": [], "posts": [], "reject": False, "denied": False, "token_form": {}, "state": None, "queries": []}
 def buffer_api(payload):
     """Buffer's one address: every question is a GraphQL question, and the question says what is wanted."""
     q, v = str(payload.get("query", "")), payload.get("variables") or {}
@@ -78,6 +78,15 @@ def buffer_api(payload):
             return R(200, {"data": {"createPost": {"message": "Queue limit reached for this channel"}}})
         return R(200, {"data": {"createPost": {"post": {"id": "bufpost1", "status": "sending", "dueAt": None,
                                                         "externalLink": None}}}})
+    if "deletePost" in q:
+        buf.setdefault("deleted", []).append(v.get("id"))
+        return R(200, {"data": {"deletePost": {"post": {"id": v.get("id")}}}})
+    if "query OnePost" in q:
+        buf["queries"].append(v.get("id"))
+        st = buf["state"] or {"status": "sending"}
+        return R(200, {"data": {"post": {"status": st["status"], "dueAt": None, "sentAt": st.get("sentAt"),
+                                         "externalLink": st.get("externalLink"),
+                                         "error": ({"message": st["error"], "supportUrl": "https://support.buffer.com"} if st.get("error") else None)}}})
     return R(200, {"errors": [{"message": "Cannot query that field."}]})
 def post(url, data=None, json=None, headers=None, params=None, timeout=None, content=None):
     calls.append(("POST", url, data or json, headers or {}))
@@ -209,6 +218,19 @@ check("Buffer: reading the channels again drops the one that is gone",
 buf["channels"] = CHANS
 check("Buffer: and brings it back", b.post("/api/accounts/buffer/sync", headers=ORIGIN).json()["channels"], 3)
 
+# ---- "why isn't it posting?": every step a clip takes through Buffer, without posting a clip
+r = b.get("/api/accounts/buffer/check")
+d = r.json()
+check("Buffer check: the whole way through, step by step", (r.status_code, len(d["steps"]) >= 4), (200, True))
+check("Buffer check: the sign-in and the channels are the first things it looks at",
+      [x["name"] for x in d["steps"]][:2], ["Buffer is connected", "Buffer answered the sign-in"])
+check("Buffer check: it posts nothing to Instagram", [p for p in buf["posts"] if p.get("metadata")], [])
+dis = next(x for x in d["steps"] if x["name"] == "Every Buffer channel is usable")
+check("Buffer check: a channel that is disconnected in Buffer is shown, in Buffer's own words",
+      (dis["ok"], "@clipper: disconnected" in dis["detail"]), (False, True))
+check("Buffer check: the other channels are still fine, so posting carries on", d["problem"], "")
+check("Buffer check: a working Buffer has nothing to report", (d["problem"], d["fix"][:13]), ("", "Buffer looks "))
+
 # ---- Buffer can also be signed in with, through an app registered here
 r = a.put("/api/apps", json={"platform": "buffer", "client_id": "buf-client-1234", "client_secret": "buf-secret-value"}, headers=ORIGIN)
 check("Buffer: an app for the one-click sign-in can be added too", (r.status_code, r.json()["buffer"]["ready"]), (200, True))
@@ -281,6 +303,63 @@ with ctx.as_user(user.id):
           (len(sent["assets"]), sent["assets"][0]["video"]["metadata"]["thumbnailOffset"]), (1, 1000))
     check("Buffer: an Instagram channel is told the clip is a Reel", sent["metadata"]["instagram"], {"type": "reel", "shouldShareToFeed": True})
     check("Buffer: the post is known by Buffer's id, with no link until it is out", (rid, url), ("bufpost1", ""))
+
+    # ---- what became of a post Buffer took: it is only posted once Buffer says it went out
+    buf["state"] = {"status": "sending"}
+    got = accounts.buffer_post_state("bufpost1")
+    check("Buffer: a post still on its way is not called posted", (got["status"], got["url"]), ("sending", ""))
+    buf["state"] = {"status": "sent", "externalLink": "https://www.instagram.com/reel/xyz/"}
+    got = accounts.buffer_post_state("bufpost1")
+    check("Buffer: once sent, with the network's link", (got["status"], got["url"]), ("sent", "https://www.instagram.com/reel/xyz/"))
+    buf["state"] = {"status": "error", "error": "The channel was disconnected", "supportUrl": "https://support.buffer.com"}
+    got = accounts.buffer_post_state("bufpost1")
+    check("Buffer: a post Buffer could not publish says why, in Buffer's words", (got["status"], got["error"]),
+          ("error", "The channel was disconnected"))
+    check("Buffer: the answer is read with the error's own fields, never as a bare object",
+          "error { message supportUrl }" in accounts.BUF_ONE, True)
+    buf["state"] = None
+
+    # ---- the refusals people actually hit are said in plain words
+    buf["reject"] = False
+    for said, want in (("Invalid post: Instagram posts require a type (post, story, or reel).", "Reel"),
+                       ("Failed to fetch image dimensions: Not Found", "ANHY_PUBLIC_URL"),
+                       ("Queue limit reached for this channel", "posting limit"),
+                       ("The video is too long for Instagram", "Reels")):
+        check(f"Buffer: a refusal ({said[:34]}…) says what to do", want in accounts._buf_refusal(said, bufacc), True)
+
+    # ---- sending goes through the queue, and the queue keeps asking Buffer until the post is out
+    from anhy import posting, jobs as jobs_mod
+    posting._posts[:] = []
+    jd2 = Path(os.environ["ANHY_DATA"]) / "qjob"
+    (jd2 / "clips").mkdir(parents=True, exist_ok=True)
+    (jd2 / "clips" / "clip01.mp4").write_bytes(b"x" * 10)
+    job = {"id": "job-abcdefgh", "user": user.id, "creator": None, "dir": str(jd2), "clips": [
+        {"id": "clip01", "status": "done", "file": "clip01.mp4", "title": "A title", "start": 0, "end": 20, "score": 90}]}
+    jobs_mod._jobs[job["id"]] = job
+    clip = job["clips"][0]
+    accs_buf = [a["id"] for a in accounts.list_accounts() if a["platform"] == "buffer"]
+    with ctx.as_user(user.id):
+        made = posting.enqueue(job, clip, accs_buf[:1], now=True)
+    check("Queue: the post waits its turn", (len(made), made[0]["status"]), (1, "scheduled"))
+    buf["posts"].clear()
+    buf["state"] = {"status": "sending"}
+    with ctx.as_user(user.id):
+        posting._post(made[0])
+    check("Queue: Buffer taking it is not the network having it", made[0]["status"], "sent")
+    check("Queue: ...so it is still counted as waiting", made[0]["status"] in posting.OPEN, True)
+    buf["state"] = {"status": "sent", "externalLink": "https://www.instagram.com/reel/abc/"}
+    with ctx.as_user(user.id):
+        posting._buffer_settle()
+    check("Queue: asking Buffer again marks it posted, with its link", (made[0]["status"], made[0]["url"]),
+          ("posted", "https://www.instagram.com/reel/abc/"))
+    check("Queue: and it stops being waited on", made[0]["status"] in posting.OPEN, False)
+    buf["state"] = {"status": "sent", "externalLink": "https://www.instagram.com/reel/def/"}
+    with ctx.as_user(user.id):
+        made2 = posting.enqueue(job, clip, accs_buf[:1], now=True)
+    check("Queue: the same clip never goes to the same account twice", len(made2), 0)
+    posting._posts[:] = []
+    buf["state"] = None
+    jobs_mod._jobs.pop(job["id"], None)
     try:
         accounts.buffer_upload(bufacc, jd / "clip01.mp4", "My caption")
         check("Buffer: a clip with no job to fetch from is refused", False)

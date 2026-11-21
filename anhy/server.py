@@ -1328,6 +1328,22 @@ def list_accounts():
     return accounts.list_accounts()
 
 
+@app.get("/api/accounts/buffer/check")
+def buffer_check():
+    """Every step a clip goes through on its way to Buffer, and where it stops. Buffer takes a post and only refuses
+    it later, with an answer that still looks like success, so "it did not post" is hard to see from the outside:
+    this checks the sign-in, the channels, the address Buffer fetches from and the Reels setting, and asks Buffer
+    whether it takes a post at all. Nothing is published to a network: its one test post goes to X (when there is
+    one) and is removed again straight away."""
+    _throttle("bufcheck:" + ctx.uid(), 6, 600)
+    try:
+        return accounts.buffer_diagnose()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+
+
 @app.delete("/api/accounts/{aid}")
 def remove_account(aid: str):
     accounts.remove(aid)
@@ -1491,7 +1507,7 @@ def add_posts(body: dict = Body(...)):
 @app.post("/api/posts/{pid}/{action}")
 def post_action(pid: str, action: str):
     try:
-        {"cancel": posting.cancel, "retry": posting.retry}[action](pid)
+        {"cancel": posting.cancel, "retry": posting.retry, "check": posting.check}[action](pid)
     except KeyError:
         raise HTTPException(404)
     except ValueError as e:
