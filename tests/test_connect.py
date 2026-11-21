@@ -404,6 +404,12 @@ with ctx.as_user(user.id):
           [{"username": "streamer_one", "x": 0.5, "y": 0.5}, {"username": "cohost", "x": 0.5, "y": 0.5}])
     check("Posting worker: appends @mentions for Buffer Instagram channel",
           "@streamer_one @cohost" in buf["posts"][-1]["text"], True)
+    sg_all = b.get("/api/instagram-tags/suggest").json()["suggestions"]
+    check("Instagram tag suggest: returns connected account and previously tagged IDs",
+          {s["username"] for s in sg_all} >= {"streamer_one", "cohost"}, True)
+    sg_q = b.get("/api/instagram-tags/suggest?q=@str").json()["suggestions"]
+    check("Instagram tag suggest: filters by typed prefix",
+          [s["username"] for s in sg_q], ["streamer_one"])
     posting._posts[:] = []
     buf["state"] = None
     jobs_mod._jobs.pop(job["id"], None)
