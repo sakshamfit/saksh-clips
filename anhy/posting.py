@@ -48,7 +48,7 @@ def _mirror(p):
     job = jobs.get(p["job"])
     clip = next((c for c in job["clips"] if c["id"] == p["clip"]), None) if job else None
     if clip is not None:
-        clip.setdefault("posts", {})[p["id"]] = {k: p.get(k) for k in ("account_name", "platform", "status", "url", "due_at", "error")}
+        clip.setdefault("posts", {})[p["id"]] = {k: p.get(k) for k in ("account_name", "platform", "status", "url", "due_at", "error", "instagram_tags")}
         jobs.save(job)
 
 
@@ -64,8 +64,14 @@ def _next_slot(account_id, gap_min, cap):
     return t
 
 
-def enqueue(job, clip, account_ids, now=False) -> list:
+def _is_ig_account(acc: dict) -> bool:
+    return bool(acc) and (acc.get("platform") == "instagram"
+                          or (acc.get("platform") == "buffer" and acc.get("service") == "instagram"))
+
+
+def enqueue(job, clip, account_ids, now=False, instagram_tags=None) -> list:
     c = creators.get(job["creator"]) or creators.DEFAULTS
+    tags = accounts.clean_instagram_tags(instagram_tags)
     made = []
     with _lock:
         for aid in account_ids:
@@ -80,8 +86,12 @@ def enqueue(job, clip, account_ids, now=False) -> list:
                  "account": aid, "account_name": acc["name"], "platform": acc["platform"], "status": "scheduled",
                  "due_at": due, "created": time.time(), "title": clip.get("title") or clip.get("hook") or "Clip",
                  "score": clip.get("score", 0), "tries": 0, "url": "", "remote_id": "", "error": None, "views": None}
+            if tags and _is_ig_account(acc):
+                p["instagram_tags"] = list(tags)
             _posts.append(p)
             made.append(p)
+        if made and tags:
+            clip["instagram_tags"] = list(tags)
         _save()
     for p in made:
         _mirror(p)
@@ -117,15 +127,17 @@ def _post(p):
         path = Path(job["dir"]) / "clips" / clip["file"]
         creator = creators.get(job["creator"]) or dict(creators.DEFAULTS, name="clips")
         title, cap = clip.get("title") or clip.get("hook") or "Clip", _caption(clip, creator)
+        ig_tags = accounts.clean_instagram_tags(p.get("instagram_tags"))
         if acc["platform"] == "youtube":
             shorts = "" if any(str(tag).lower() == "shorts" for tag in clip.get("hashtags", [])) else "\n\n#Shorts"
             rid, url = accounts.youtube_upload(acc, path, title, cap + shorts, clip.get("hashtags", []), creator["privacy"])
         elif acc["platform"] == "instagram":
-            rid, url = accounts.instagram_upload(acc, path, f"{title}\n\n{cap}", job["id"])
+            rid, url = accounts.instagram_upload(acc, path, f"{title}\n\n{cap}", job["id"], user_tags=ig_tags)
         elif acc["platform"] == "tiktok":
             rid, url = accounts.tiktok_upload(acc, path, f"{title}\n\n{cap}", creator["privacy"])
         elif acc["platform"] == "buffer":
-            rid, url = accounts.buffer_upload(acc, path, f"{title}\n\n{cap}", title, job["id"], creator["privacy"])
+            rid, url = accounts.buffer_upload(acc, path, f"{title}\n\n{cap}", title, job["id"], creator["privacy"],
+                                              user_tags=ig_tags if acc.get("service") == "instagram" else None)
             # Buffer taking the post is not the same as the network having it. It stays "sent" (shown as "Sent to
             # Buffer") until Buffer says it went out, or says why it did not: _buffer_settle keeps asking.
             sent = accounts.buffer_post_state(rid)

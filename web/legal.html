@@ -8,52 +8,70 @@
 <link rel="canonical" href="{{SITE}}/{{PAGE_PATH}}">
 <meta name="robots" content="index,follow">
 <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem("anhy-theme");
+    if (!t) t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+    document.documentElement.classList.toggle("dark", t === "dark");
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/assets/app-theme.css">
 <style>
-:root{--brand:#FF8B33;--ink:#2A1A12;--deep:#A9480A;--muted:#F7F4F1;--line:#EEE8E4;--text:#211813;--dim:#6D6159;--faint:#A0948C;color-scheme:light}
-*{box-sizing:border-box}
-body{margin:0;background:#fff;color:var(--text);font:16px/1.7 "Geist","Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
-a{color:var(--deep)}
-header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);z-index:2}
-.bar{max-width:860px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.bar img{height:30px;display:block}
-.bar nav{margin-left:auto;display:flex;gap:2px;padding:3px;background:var(--muted);border-radius:10px;overflow-x:auto;max-width:100%}
-.bar nav a{font-size:14px;font-weight:600;color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;white-space:nowrap;transition:background-color .15s ease,color .15s ease}
-.bar nav a:hover{background:#EDE3DB;color:var(--text)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.7 var(--font-sans)}
+a{color:var(--ink);font-weight:500}
+header{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);z-index:2}
+.bar{max-width:860px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bar img{height:26px;display:block}
+.bar nav{margin-left:auto;display:flex;gap:2px;padding:3px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;overflow-x:auto;max-width:100%}
+.bar nav a{font-size:13.5px;font-weight:500;color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:7px;white-space:nowrap;transition:background-color .15s ease,color .15s ease}
+.bar nav a:hover{color:var(--ink)}
 body[data-page=privacy] nav a[href="/privacy"],body[data-page=terms] nav a[href="/terms"],
-body[data-page=acceptable-use] nav a[href="/acceptable-use"]{background:var(--brand);color:var(--ink)}
-main{max-width:860px;margin:0 auto;padding:40px 20px 80px}
+body[data-page=acceptable-use] nav a[href="/acceptable-use"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--shadow-xs)}
+:root[data-theme="dark"] body[data-page=privacy] nav a[href="/privacy"],:root[data-theme="dark"] body[data-page=terms] nav a[href="/terms"],
+:root[data-theme="dark"] body[data-page=acceptable-use] nav a[href="/acceptable-use"]{background:var(--surface-3)}
+main{max-width:860px;margin:0 auto;padding:44px 20px 80px}
 article{display:none}
 body[data-page=privacy] #privacy,body[data-page=terms] #terms,body[data-page=acceptable-use] #acceptable-use{display:block}
-h1{font-size:clamp(30px,4vw,40px);line-height:1.15;letter-spacing:-.03em;margin:0 0 6px;color:var(--ink)}
-.updated{color:var(--faint);font-size:14px;margin:0 0 28px}
-h2{font-size:19px;letter-spacing:-.01em;margin:34px 0 8px;color:var(--ink)}
-p,li{color:#3B2E27}
+h1{font-size:clamp(28px,4vw,38px);line-height:1.15;letter-spacing:-.03em;margin:0 0 6px;color:var(--ink)}
+.updated{color:var(--subtle);font-size:13.5px;margin:0 0 28px}
+h2{font-size:18px;letter-spacing:-.015em;margin:34px 0 8px;color:var(--ink)}
+p,li{color:var(--ink-2)}
 ul{padding-left:20px}
 li{margin:4px 0}
-.box{background:var(--muted);border-radius:12px;padding:16px 18px;margin:18px 0}
+.box{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:18px 0}
 .caps{font-weight:600}
-footer.site{background:#1E1612;color:#B9A597;padding:56px 0 28px;font-size:14px}
-footer.site .fwrap{max-width:1160px;margin:0 auto;padding:0 24px}
+footer.site{background:var(--surface);color:var(--muted);border-top:1px solid var(--border);padding:48px 0 28px;font-size:13.5px}
+footer.site .fwrap{max-width:1120px;margin:0 auto;padding:0 24px}
 footer.site .fgrid{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:32px}
-footer.site .fbrand img{height:30px;display:block;margin-bottom:14px}
-footer.site .fbrand p{max-width:300px;line-height:1.6;margin:0 0 18px;color:#B9A597}
-footer.site .fbrand a.fcta{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:10px;background:#FF8B33;color:#2A1A12;font-weight:600;text-decoration:none;transition:background-color .15s ease}
-footer.site .fbrand a.fcta:hover{background:#FF9A4C}
-footer.site h4{font-size:13px;font-weight:600;color:#fff;margin:4px 0 14px}
-footer.site ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
-footer.site ul a{color:#B9A597;text-decoration:none;transition:color .15s ease}
-footer.site ul a:hover{color:#FF8B33}
-footer.site .fbottom{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:44px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08);font-size:13px;color:#8C7B70}
+footer.site .fbrand img{height:26px;display:block;margin-bottom:14px}
+footer.site .fbrand p{max-width:300px;line-height:1.6;margin:0 0 18px;color:var(--muted)}
+footer.site .fbrand a.fcta{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none}
+footer.site .fbrand a.fcta:hover{background:var(--accent-hover)}
+footer.site h4{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin:4px 0 14px}
+footer.site ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px}
+footer.site ul a{color:var(--muted);text-decoration:none;font-weight:400}
+footer.site ul a:hover{color:var(--ink)}
+footer.site .fbottom{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:40px;padding-top:18px;border-top:1px solid var(--border);font-size:12.5px;color:var(--subtle)}
 @media (max-width:760px){footer.site .fgrid{grid-template-columns:1fr 1fr}footer.site .fbrand{grid-column:1/-1}}
 html{scroll-behavior:smooth}
-article{animation:legalin .35s ease both}
-@keyframes legalin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+article{animation:legalin .25s ease both}
+@keyframes legalin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){article{animation:none}}
 </style>
 </head>
 <body data-page="{{PAGE}}">
-<header><div class="bar"><a href="/" aria-label="Anhy Clips home"><img src="/brand/logo.svg" alt="Anhy Clips" width="120" height="30"></a>
-  <nav aria-label="Legal pages"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/acceptable-use">Acceptable use</a></nav></div></header>
+<header><div class="bar"><a href="/" aria-label="Anhy Clips home"><img class="brand-logo-auto" src="/brand/logo.svg" alt="Anhy Clips" width="110" height="26"></a>
+  <nav aria-label="Legal pages"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/acceptable-use">Acceptable use</a></nav>
+  <button type="button" class="theme-toggle-btn" id="themeBtn" aria-label="Toggle dark and light theme" title="Toggle theme">
+    <svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    <svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+  </button></div></header>
 <main>
 
 <!-- ============================================================ TERMS -->
@@ -216,16 +234,24 @@ article{animation:legalin .35s ease both}
 </main>
 <footer class="site"><div class="fwrap">
   <div class="fgrid">
-    <div class="fbrand"><a href="/" aria-label="Anhy Clips home"><img src="/brand/logo-light.svg" alt="Anhy Clips" width="120" height="30"></a>
-      <p>AI clipping for Twitch, Kick and YouTube streams. Captioned vertical clips while the stream is still live. Free and open source.</p>
-      <a class="fcta" href="/signup">Sign up</a></div>
-    <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/#live">Live clipping</a></li><li><a href="/#open">Open source</a></li><li><a href="/#faq">FAQ</a></li></ul></div>
+    <div class="fbrand"><a href="/" aria-label="Anhy Clips home"><img class="brand-logo-auto" src="/brand/logo.svg" alt="Anhy Clips" width="110" height="26"></a>
+      <p>Signal-aware AI clipping for Twitch, Kick and YouTube streams. Captioned vertical clips while the stream is still live. Free and open source.</p>
+      <a class="fcta" href="/signup">Open studio</a></div>
+    <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#editing">Editing</a></li><li><a href="/#live">Live clipping</a></li><li><a href="/#open">Open source</a></li><li><a href="/#faq">FAQ</a></li></ul></div>
     <div><h4>Get started</h4><ul><li><a href="/signup">Create an account</a></li><li><a href="/login">Sign in</a></li><li><a href="/reset">Reset password</a></li></ul></div>
     <div><h4>Legal</h4><ul><li><a href="/terms">Terms of Service</a></li><li><a href="/privacy">Privacy Policy</a></li><li><a href="/acceptable-use">Acceptable Use</a></li></ul></div>
   </div>
   <div class="fbottom"><span>© <span class="fy"></span> Anhy Clips</span><span>Free and open source.</span></div>
 </div></footer>
-<script>document.querySelectorAll(".fy").forEach(e => e.textContent = new Date().getFullYear());</script>
+<script>
+document.querySelectorAll(".fy").forEach(e => e.textContent = new Date().getFullYear());
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  document.documentElement.classList.toggle("dark", next === "dark");
+  try { localStorage.setItem("anhy-theme", next); } catch (e) {}
+});
+</script>
 <script>
 // switch between the three pages in place: a short fade, the address and title follow
 const TITLES = {terms: "Terms of Service", privacy: "Privacy Policy", "acceptable-use": "Acceptable Use Policy"};

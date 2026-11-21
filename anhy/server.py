@@ -425,11 +425,11 @@ def brand(name: str):
 
 @app.get("/assets/{name}")
 def asset(name: str):
-    # Keep the existing JS asset route; only the particle stylesheet is public CSS.
-    if not (re.fullmatch(r"[\w\-]+\.js", name) or name in ("particle-title.css", "landing-theme.css", "orion-footer.css")) or not (WEB / name).is_file():
+    css_assets = ("particle-title.css", "landing-theme.css", "orion-footer.css", "app-theme.css")
+    if not (re.fullmatch(r"[\w\-]+\.js", name) or name in css_assets) or not (WEB / name).is_file():
         raise HTTPException(404)
     media_type = "text/css" if name.endswith(".css") else "text/javascript"
-    cache = "public, max-age=300" if name in ("particle-title.js", "particle-title.css", "landing-theme.css", "orion-footer.css") else "public, max-age=86400, stale-while-revalidate=604800"
+    cache = "public, max-age=300" if name in ("particle-title.js",) + css_assets else "public, max-age=86400, stale-while-revalidate=604800"
     return FileResponse(WEB / name, media_type=media_type, headers={"Cache-Control": cache})
 
 
@@ -583,7 +583,8 @@ def status(request: Request):
             "tour": not accounts.settings()["tour_done"],
             "youtube": accounts.youtube_ready(), "connect": {p: accounts.can_connect(p) for p in accounts.PLATFORM_NAMES}, "max_upload_mb": config.MAX_UPLOAD_MB, "upload_part_mb": config.UPLOAD_PART_MB, "max_batch": config.MAX_ACTIVE_JOBS_PER_USER,
             "local_pick": local.enabled(me_), "video_kinds": sorted(media.VIDEO_EXTS),
-            "styles": {k: v["label"] for k, v in render.STYLES.items()}, "layouts": render.LAYOUTS}
+            "styles": {k: v["label"] for k, v in render.STYLES.items()}, "layouts": render.LAYOUTS,
+            "edit_styles": render.EDIT_STYLE_META}
 
 
 # ================================================================ videos
@@ -1647,10 +1648,15 @@ def add_posts(body: dict = Body(...)):
     clip = next((c for c in job["clips"] if c["id"] == body.get("clip")), None) if job else None
     if not clip or clip.get("status") != "done":
         raise HTTPException(404, "That clip is not ready")
-    made = posting.enqueue(job, clip, [str(a) for a in body.get("accounts", [])][:20], now=bool(body.get("now")))
+    try:
+        ig_tags = accounts.parse_instagram_tags(body.get("instagram_tags"), strict=True)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    made = posting.enqueue(job, clip, [str(a) for a in body.get("accounts", [])][:20],
+                           now=bool(body.get("now")), instagram_tags=ig_tags)
     if not made:
         raise HTTPException(400, "Nothing was queued. Pick at least one account this clip has not already gone to.")
-    return {"queued": len(made)}
+    return {"queued": len(made), "instagram_tags": ig_tags}
 
 
 @app.post("/api/posts/{pid}/{action}")

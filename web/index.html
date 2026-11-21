@@ -7,16 +7,35 @@
 <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@300&family=Archivo+Black&family=Anton&family=Poppins:wght@800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Archivo+Black&family=Anton&family=Poppins:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app-theme.css">
+<script>
+(function(){
+  try {
+    var saved = localStorage.getItem("anhy-theme");
+    var t = saved === "dark" || saved === "light" ? saved : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.theme = t;
+    document.documentElement.classList.toggle("dark", t === "dark");
+  } catch (e) {}
+})();
+</script>
 <style>
 :root{
-  --brand:#FF8B33;--brand-press:#F27A1F;--brand-ink:#2A1A12;--brand-soft:#FFF2E8;--brand-line:#FFD9BC;--brand-deep:#A9480A;
-  --frame:#1E1612;--frame-2:#2C221D;--frame-line:rgba(255,255,255,.08);--frame-text:#F4EEEA;--frame-dim:#A99A91;
-  --bg:#FFFFFF;--muted:#F7F4F1;--line:#EEE8E4;--line-2:#E1D9D3;
-  --text:#211813;--dim:#6D6159;--faint:#A0948C;
-  --good:#0F8A57;--good-soft:#E6F6EE;--bad:#D3343F;--bad-soft:#FDECEE;--live:#E5323F;
+  --brand:#09090b;--brand-press:#27272a;--brand-ink:#09090b;--brand-soft:#f4f4f5;--brand-line:#d4d4d8;--brand-deep:#18181b;
+  --frame:#fafafa;--frame-2:#f0f0f2;--frame-line:#e4e4e7;--frame-text:#18181b;--frame-dim:#71717a;
+  --bg:#ffffff;--muted:#f4f4f5;--line:#e4e4e7;--line-2:#d4d4d8;
+  --text:#09090b;--dim:#52525b;--faint:#71717a;
+  --good:#15803d;--good-soft:#ecfdf5;--bad:#dc2626;--bad-soft:#fef2f2;--live:#e11d48;
   --r-lg:16px;--r:12px;--r-sm:8px;
   color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --brand:#fafafa;--brand-press:#e4e4e7;--brand-ink:#fafafa;--brand-soft:#1c1c21;--brand-line:#3f3f46;--brand-deep:#fafafa;
+  --frame:#0c0c0f;--frame-2:#18181c;--frame-line:#222227;--frame-text:#f4f4f5;--frame-dim:#a1a1aa;
+  --bg:#111114;--muted:#18181c;--line:#27272a;--line-2:#3f3f46;
+  --text:#fafafa;--dim:#a1a1aa;--faint:#71717a;
+  --good:#4ade80;--good-soft:rgba(74,222,128,.14);--bad:#f87171;--bad-soft:rgba(248,113,113,.14);--live:#fb7185;
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -894,12 +913,227 @@ dialog[open]{animation:fadein .16s ease}
   .set-sec h2{font-size:16px}
   .ai-big{font-size:24px}
 }
+
+/* ============================================================
+   Unified Minimalist Monochrome Redesign (Light & Dark Mode)
+   ============================================================ */
+body{background:var(--frame);color:var(--text)}
+main{background:var(--bg);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.02)}
+.side{background:var(--frame);border-right:1px solid transparent}
+.side-head .logo{height:30px;filter:none}
+:root[data-theme="dark"] .side-head .logo{filter:invert(1) brightness(1.06)}
+.nav-item{color:var(--frame-text);border-radius:9px}
+.nav-item svg{color:var(--frame-dim)}
+.nav-item:hover{background:var(--frame-2)}
+.nav-item.on{background:var(--brand);color:var(--bg);font-weight:600}
+.nav-item.on svg{color:var(--bg)}
+.nav-item.on:hover{background:var(--brand-press)}
+.nav-item .count{background:var(--frame-2);color:var(--frame-dim)}
+.nav-item.on .count{background:rgba(255,255,255,.18);color:var(--bg)}
+:root[data-theme="dark"] .nav-item.on .count{background:rgba(0,0,0,.22);color:#09090b}
+.avatar{background:var(--frame-2);color:var(--frame-text);border:1px solid var(--line)}
+.nav-item.on .avatar{background:rgba(255,255,255,.18);color:var(--bg);border-color:transparent}
+:root[data-theme="dark"] .nav-item.on .avatar{background:rgba(0,0,0,.18);color:#09090b}
+.ai-card{background:var(--bg);border:1px solid var(--line);color:var(--text)}
+.ai-card:hover{background:var(--frame-2)}
+.ai-card.on{border-color:var(--brand)}
+.ai-card .ai-ic{background:var(--muted);color:var(--text)}
+.ai-card .ai-n{color:var(--dim)}
+
+/* Buttons — crisp monochrome hierarchy */
+.btn{background:var(--bg);border:1px solid var(--line-2);color:var(--text);border-radius:10px}
+.btn:hover{background:var(--muted);border-color:var(--line-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--bg);font-weight:600}
+.btn.primary:hover{background:var(--brand-press);border-color:var(--brand-press)}
+.btn.dark{background:var(--brand);border-color:var(--brand);color:var(--bg)}
+.btn.dark:hover{background:var(--brand-press);border-color:var(--brand-press)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--dim)}
+.btn.ghost:hover{background:var(--muted);color:var(--text)}
+.btn.danger{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.btn.danger:hover{background:var(--bad);color:#fff}
+
+/* Topbar & tabs */
+.topbar{background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar h1{font-weight:600;letter-spacing:-0.02em;color:var(--text)}
+.topbar #subtitle{color:var(--dim)}
+.topbar .titles{min-width:130px}
+@media (max-width:640px){.topbar{padding:10px 14px;gap:8px}.topbar .titles{min-width:140px;flex:1 1 auto}.topbar-theme{margin-left:auto}.topbar #actions{order:4;flex-basis:100%;gap:6px}.topbar #actions .btn .long{display:none}}
+.utabs{background:var(--muted);border:1px solid var(--line)}
+.utabs .ind{background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+:root[data-theme="dark"] .utabs .ind{background:#27272a}
+.utabs .tabbtn.on,.utabs .tabbtn.on svg{color:var(--text);font-weight:600}
+.utabs .tabbtn:hover{background:transparent;color:var(--text)}
+.utabs .tabbtn.on .n{background:var(--muted);color:var(--text)}
+.topbar-theme{margin-left:4px}
+.theme-toggle-btn .ic-sun{display:none}
+.theme-toggle-btn .ic-moon{display:block}
+:root[data-theme="dark"] .theme-toggle-btn .ic-sun{display:block}
+:root[data-theme="dark"] .theme-toggle-btn .ic-moon{display:none}
+:root[data-theme="dark"] .btn.primary .rdot{background:#e11d48}
+
+/* Banners */
+.vb{background:var(--muted);border:1px solid var(--line);color:var(--text)}
+.vb>svg,.vb b{color:var(--text)}
+.vb .btn.primary svg{color:var(--bg)}
+
+/* Hero & Prompt-Composer Studio Card */
+.hero{background:var(--bg);border-bottom:1px solid var(--line);padding:44px 28px 36px}
+.hero h2{font-family:"Geist","Inter",system-ui,sans-serif;font-weight:600;letter-spacing:-0.03em;color:var(--text)}
+.hero>p{color:var(--dim)}
+.composer{background:var(--bg);border:1px solid var(--line-2);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 10px 28px rgba(0,0,0,.04)}
+:root[data-theme="dark"] .composer{background:#16161a;border-color:#2c2c32;box-shadow:0 12px 32px rgba(0,0,0,.36)}
+.composer:focus-within{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+.composer-input{border-bottom:1px solid var(--line)}
+.composer-input svg{color:var(--faint)}
+.composer-input input::placeholder,.composer-guidance textarea::placeholder{color:var(--faint)}
+.composer-guidance{background:transparent;border-bottom:1px solid var(--line);padding:10px 14px}
+.composer-guidance span{color:var(--dim);font-size:12px;font-weight:500}
+.composer-guidance textarea{background:var(--muted);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:8px 10px}
+.composer-guidance textarea:focus{outline:none;border-color:var(--brand);background:var(--bg)}
+
+/* Discoverable Editing Controls Strip directly inside Composer */
+.composer-edit-strip{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--muted)}
+:root[data-theme="dark"] .composer-edit-strip{background:#121216}
+.composer-edit-label{font-size:12px;font-weight:600;color:var(--dim);letter-spacing:-0.01em}
+.composer-edit-desc{font-size:12px;color:var(--faint);flex:1;min-width:170px}
+.seg-edit{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.seg-edit button{height:28px;padding:0 11px;border-radius:7px;border:0;background:transparent;color:var(--dim);font-size:12px;font-weight:500;cursor:pointer;transition:background-color .15s ease,color .15s ease}
+.seg-edit button:hover{color:var(--text)}
+.seg-edit button[aria-pressed="true"]{background:var(--brand);color:var(--bg);font-weight:600}
+.sfx-toggle{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg);color:var(--dim);font-size:12px;font-weight:500;cursor:pointer;transition:background-color .15s ease,color .15s ease,border-color .15s ease}
+.sfx-toggle:hover{color:var(--text);border-color:var(--brand)}
+.sfx-toggle[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--bg);font-weight:600}
+.sfx-toggle:disabled{opacity:.42;cursor:not-allowed}
+.sfx-toggle svg{width:14px;height:14px}
+
+.chip,.composer.compact .chip{background:var(--bg);border:1px solid var(--line-2);color:var(--dim);border-radius:9px}
+.chip:hover,.composer.compact .chip:hover{background:var(--muted);color:var(--text);border-color:var(--line-2)}
+.chip.on,.pick.open .chip,.composer.compact .chip.on{background:var(--brand);border-color:var(--brand);color:var(--bg)}
+.chip.on:hover,.pick.open .chip:hover{background:var(--brand-press);color:var(--bg)}
+.composer-bar .hint{white-space:nowrap;flex-shrink:0}
+.composer.big .composer-bar .hint{display:none}
+@media (max-width:1180px){.composer-bar .hint{display:none}}
+.veil span{background:rgba(9,9,11,.78);color:#fff}
+.shot:hover .veil span{background:var(--brand);color:var(--bg)}
+.lay-prev .ph{background:#27272a}
+.lay-prev .ph i{background:#a1a1aa}
+.lay-prev.crop .ph,.lay-prev.gameplay .ph{background:#52525b}
+.badge{background:rgba(9,9,11,.82);color:#fff}
+.badge.r{background:rgba(9,9,11,.82);color:#fff}
+:root[data-theme="dark"] .chan input{background:#111114;border-color:#2e2e36;color:#fafafa}
+:root[data-theme="dark"] .chan{background:#111114;border-color:#27272a}
+.lookbar{background:transparent;border-top:1px solid var(--line)}
+.look-btn{background:var(--muted);border:1px solid var(--line);color:var(--text)}
+.look-btn:hover{border-color:var(--brand)}
+.look-edit{color:var(--text);font-weight:600}
+.composer-opts{background:var(--muted);border-top:1px solid var(--line)}
+.ob{background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.seg{background:var(--muted);border:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--bg)}
+
+/* Surfaces: cards, tiles, clips, tables, forms, popovers, dialogs */
+.card,.tile,.clip,.plan,.appcard,.livecard,.ai-home,.pick-menu,.pop,.ntoast,dialog,.tr-card{background:var(--bg);border:1px solid var(--line);color:var(--text)}
+:root[data-theme="dark"] .card,:root[data-theme="dark"] .tile,:root[data-theme="dark"] .clip,:root[data-theme="dark"] .appcard,:root[data-theme="dark"] .livecard,:root[data-theme="dark"] .ai-home,:root[data-theme="dark"] .pick-menu,:root[data-theme="dark"] .pop,:root[data-theme="dark"] .ntoast,:root[data-theme="dark"] dialog,:root[data-theme="dark"] .tr-card{background:#16161a;border-color:#27272a}
+.tile i{background:var(--muted);color:var(--text)}
+.tile b,.card h2,.job-head h3,.hook,.ai-big,.stat b,.evbtn,.pop-head h3,.dlg h2,.plan b,.tr-body h2,.ntoast b,.nt b,.lc-title h3,.set-sec h2{color:var(--text)}
+.step{background:var(--muted);border:1px solid var(--line);color:var(--text)}
+.step:hover{background:var(--frame-2)}
+.step .n{background:var(--brand);color:var(--bg)}
+.f input,.f select,.f textarea,.lb-path,.nstep input{background:var(--bg);border:1px solid var(--line-2);color:var(--text)}
+:root[data-theme="dark"] .f input,:root[data-theme="dark"] .f select,:root[data-theme="dark"] .f textarea,:root[data-theme="dark"] .lb-path,:root[data-theme="dark"] .nstep input{background:#111114;border-color:#2e2e36;color:#fafafa}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 2px rgba(128,128,128,.16)}
+.ck{background:var(--bg);border:1px solid var(--line-2);color:var(--text)}
+.ck:hover{border-color:var(--brand)}
+label.sw input:checked{background:var(--brand);border-color:var(--brand)}
+:root[data-theme="dark"] label.sw input:checked::after{background:#09090b}
+.pill{background:var(--muted);color:var(--dim)}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--muted);color:var(--text);border:1px solid var(--line-2)}
+.bar{background:var(--muted)}
+.bar i{background:var(--brand)}
+.chart .b1{fill:var(--brand)}
+.chart .b2{fill:var(--faint)}
+.hbar-row .track i{background:var(--brand)}
+tr:hover>td{background:var(--muted)}
+a.lnk{color:var(--text);text-decoration:underline;text-underline-offset:2px}
+a.lnk:hover{opacity:.75}
+.pick-opt:hover,.pick-opt:focus-visible{background:var(--muted)}
+.pick-opt[aria-selected="true"]{background:var(--muted);color:var(--text);font-weight:600}
+.pd-opt{background:var(--bg);border:1px solid var(--line-2);color:var(--text)}
+.pd-opt[aria-pressed="true"]{border-color:var(--brand);background:var(--muted);box-shadow:0 0 0 1px var(--brand)}
+.pd-look{background:var(--muted);border:1px solid var(--line)}
+.lp{background:var(--bg);border:1px solid var(--line)}
+.lp.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.addrow{background:var(--muted);border:1px dashed var(--line-2);color:var(--dim)}
+.addrow:hover{border-color:var(--brand);color:var(--text)}
+.set-link.on{background:var(--muted);color:var(--text);font-weight:600}
+.set-link:hover{background:var(--muted)}
+.appsetup,.stor-path code,.stor-change{background:var(--muted);border:1px solid var(--line)}
+.savebar{background:var(--brand);color:var(--bg)}
+.savebar .btn{background:transparent;color:var(--bg);border-color:rgba(255,255,255,.25)}
+.savebar .btn.primary{background:var(--bg);color:var(--brand);border-color:var(--bg)}
+:root[data-theme="dark"] .savebar{background:#fafafa;color:#09090b}
+:root[data-theme="dark"] .savebar .btn{color:#09090b;border-color:rgba(9,9,11,.22)}
+:root[data-theme="dark"] .savebar .btn.primary{background:#09090b;color:#fafafa;border-color:#09090b}
+#selbar{background:var(--brand);color:var(--bg)}
+.toast{background:var(--brand);color:var(--bg);border-color:transparent}
+.toast::before{background:var(--bg)}
+.ntoast:hover{background:var(--muted)}
+.ntoast i,.nt i{background:var(--muted);color:var(--text)}
+.nt.new b::after{background:var(--brand)}
+.tr-art{background:var(--muted)}
+.tr-chip{background:var(--bg);border:1px solid var(--line);color:var(--text)}
+.tr-chip svg{color:var(--dim)}
+.tr-chip.on{background:var(--brand);border-color:var(--brand);color:var(--bg)}
+.tr-chip.on svg{color:var(--bg)}
+.tr-x{background:var(--bg);border:1px solid var(--line);color:var(--text)}
+.tr-x:hover{background:var(--muted)}
+.tr-bar i{background:var(--brand)}
+.tr-back{background:var(--muted);color:var(--text)}
+.tr-back:hover{background:var(--frame-2)}
+.shot:hover .veil span{background:var(--brand);color:var(--bg)}
+.stream{background:#111114;border:1px solid #27272a}
+.editor .stage{background:#09090b}
+::-webkit-scrollbar-thumb{background:var(--line-2);border:3px solid var(--bg)}
+:root[data-theme="dark"] .badge.s-hi{background:#16a34a;color:#fff}
+:root[data-theme="dark"] .badge.s-mid{background:#ca8a04;color:#fff}
+:root[data-theme="dark"] .err{background:rgba(248,113,113,.12);color:#fca5a5}
+:root[data-theme="dark"] .danger-card{border-color:rgba(248,113,113,.3)}
+:root[data-theme="dark"] .livecard{border-color:rgba(251,113,133,.35)}
+
+/* Clip Edit Badge & Applied Effects Transparency */
+.clip-edit-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.clip-edit-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--muted);border:1px solid var(--line);color:var(--text);letter-spacing:-0.01em}
+.clip-edit-badge.applied{background:var(--brand);border-color:var(--brand);color:var(--bg)}
+.clip-edit-badge.muted{color:var(--dim)}
+.clip-edit-details{margin-top:6px;border-top:1px solid var(--line);padding-top:6px;font-size:11.5px;color:var(--dim)}
+.clip-edit-details summary{cursor:pointer;font-weight:500;color:var(--dim);list-style:none;display:flex;align-items:center;justify-content:space-between;gap:6px;user-select:none}
+.clip-edit-details summary::-webkit-details-marker{display:none}
+.clip-edit-details summary:hover{color:var(--text)}
+.clip-edit-details[open] summary{color:var(--text);margin-bottom:6px}
+.clip-edit-list{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}
+.clip-edit-list li{display:flex;gap:6px;align-items:baseline;line-height:1.4}
+.clip-edit-list .tcode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:var(--text);background:var(--muted);padding:1px 5px;border-radius:5px;flex:none}
+.edit-panel-box{background:var(--muted);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.edit-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.edit-panel-head b{font-size:13px;color:var(--text)}
+.edit-panel-desc{font-size:12px;color:var(--dim);line-height:1.45}
+.edit-summary-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+.edit-summary-box .es-title{font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px}
+.edit-summary-box .es-note{color:var(--dim);line-height:1.45}
+.edit-summary-box .es-pills{display:flex;flex-wrap:wrap;gap:4px}
+.edit-summary-box .es-pill{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--muted);border:1px solid var(--line);color:var(--text)}
+.ig-tag-box{background:var(--muted);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ig-tag-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ig-tag-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line-2);color:var(--text)}
+.ig-tag-err{font-size:12px;color:var(--bad);margin:0}
 </style>
 </head>
 <body>
 <div class="app" id="app">
   <aside class="side" aria-label="Sidebar">
-    <div class="side-head"><img class="logo" src="/brand/logo-light.svg" alt="Anhy Clips"><img class="mark" src="/brand/favicon.svg" alt="Anhy Clips">
+    <div class="side-head"><img class="logo brand-logo-auto" src="/brand/logo.svg" alt="Anhy Clips"><img class="mark" src="/brand/favicon.svg" alt="Anhy Clips">
       <button class="icon-btn collapse" data-act="collapse" id="collapseBtn" aria-label="Collapse sidebar"></button></div>
     <nav class="nav" id="nav" aria-label="Main"></nav>
     <div class="side-foot" id="foot"></div>
@@ -907,7 +1141,12 @@ dialog[open]{animation:fadein .16s ease}
   <div class="scrim" data-act="menu"></div>
   <main id="main">
     <header class="topbar"><button class="icon-btn menu" data-act="menu" id="menuBtn" aria-label="Open menu"></button>
-      <span id="tpic"></span><div class="titles"><h1 id="title"></h1><p id="subtitle"></p></div><nav class="utabs" id="utabs" role="tablist" aria-label="Creator sections"></nav><div class="row" id="actions"></div></header>
+      <span id="tpic"></span><div class="titles"><h1 id="title"></h1><p id="subtitle"></p></div><nav class="utabs" id="utabs" role="tablist" aria-label="Creator sections"></nav><div class="row" id="actions"></div>
+      <button type="button" class="theme-toggle-btn topbar-theme" id="studioThemeBtn" aria-label="Switch color theme" title="Toggle light / dark theme">
+        <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+    </header>
     <div id="vbanner"></div>
     <div id="heroSlot"></div>
     <div class="content" id="view"></div>
@@ -1425,7 +1664,7 @@ function go(v, tab, fromHistory) {
   else if (v === "usage") { view.innerHTML = `<div id="usage"></div>`; loadUsage(); }
   else view.innerHTML = `<div id="stream"></div><div id="cbody"></div>`;   // the live player stays put across tabs: no restart, no rebuffer
   if ($("#add")) drawAdd(v === "overview" ? "hero" : "compact");
-  if (v === "overview" && window.GradientASCII) { try { window._gaStop = GradientASCII($("#appAscii"), {colors: ["#ffb27a", "#ffffff", "#ffd2ae", "#ffe0c2", "#fff1e6"], shape: "horizon", lightMode: true, cellSize: 16, density: 0.8, glyphOpacity: 0.26, gradientOpacity: 0.32, glow: 0.06, grain: 0.06, mouseInteraction: false, clickEffect: "none"}); } catch {} }
+  if (v === "overview" && window.GradientASCII) { try { const isDark = document.documentElement.dataset.theme === "dark"; window._gaStop = GradientASCII($("#appAscii"), {colors: isDark ? ["#27272a", "#111114", "#1c1c21", "#18181c", "#0c0c0f"] : ["#e4e4e7", "#ffffff", "#f4f4f5", "#fafafa", "#f4f4f5"], shape: "horizon", lightMode: !isDark, cellSize: 16, density: 0.72, glyphOpacity: 0.18, gradientOpacity: 0.22, glow: 0.02, grain: 0.04, mouseInteraction: false, clickEffect: "none"}); } catch {} }
   if (v === "settings") drawSettings();
   if (v.startsWith("c:")) setTab(S.ctab);
   $("#main").scrollTo(0, 0); render();
@@ -1442,13 +1681,142 @@ function setTab(t) {
   render();
 }
 
+/* ============================================================ clip editing helpers */
+const EDIT_STYLE_META = {
+  off: {label: "Off", desc: "Raw cut with no jump-cuts, zooms, color grade, or sound accents."},
+  balanced: {label: "Balanced", desc: "Studio voice mastering, film clarity grade, subtle dolly motion, and clean punch-ins."},
+  pro: {label: "Pro", desc: "Dead-air jump-cuts, multi-cam framing shifts, snappy punch-ins, climax impact hit, film grade, studio voice & progress bar."},
+  energetic: {label: "Energetic", desc: "Tightest jump-cut pacing, bold 1.38x snap zooms, climax micro-shake & flash, punchy film grade & cinematic SFX."}
+};
+const EDIT_STYLE_LIST = ["off", "balanced", "pro", "energetic"];
+function normEditStyle(obj) {
+  if (!obj) return "pro";
+  if (obj.auto_edit === false && (!obj.edit_style || obj.edit_style === "off")) return "off";
+  const s = String(obj.edit_style || "").toLowerCase().trim();
+  if (EDIT_STYLE_LIST.includes(s)) return s;
+  return obj.auto_edit === false ? "off" : "pro";
+}
+function editStyleDesc(style) {
+  return (S.status?.edit_styles?.[style]?.hint) || (S.status?.edit_styles?.[style]?.description) || EDIT_STYLE_META[style]?.desc || EDIT_STYLE_META.pro.desc;
+}
+function editStyleLabel(style) {
+  return (S.status?.edit_styles?.[style]?.label) || EDIT_STYLE_META[style]?.label || "Pro";
+}
+function sfxIconSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+}
+function curComposerEdit(A) {
+  const d = pickDefaults(A || att());
+  return {
+    edit_style: normEditStyle(A && A.edit_style ? A : d),
+    sound_fx: A && typeof A.sound_fx === "boolean" ? A.sound_fx : (d.sound_fx !== false)
+  };
+}
+function syncComposerEditUI(style, soundFx) {
+  const A = att();
+  A.edit_style = style;
+  A.sound_fx = !!soundFx;
+  S.lastPick = {...pickDefaults(A), ...(S.lastPick || {}), edit_style: style, auto_edit: style !== "off", sound_fx: !!soundFx};
+  const hStyle = $("#o_edit_style"), hSfx = $("#o_sound_fx");
+  if (hStyle) hStyle.value = style;
+  if (hSfx) hSfx.value = soundFx ? "1" : "0";
+  $$("[data-comp-edit]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.compEdit === style)));
+  const sfxBtn = $("#o_sfx_btn");
+  if (sfxBtn) {
+    sfxBtn.disabled = style === "off";
+    sfxBtn.setAttribute("aria-pressed", String(style !== "off" && !!soundFx));
+    const sp = sfxBtn.querySelector("span");
+    if (sp) sp.textContent = style === "off" ? "Sound: Off" : (soundFx ? "Sound: On" : "Sound: Off");
+  }
+  const desc = $("#o_edit_desc");
+  if (desc) desc.textContent = editStyleDesc(style);
+  drawLookBar();
+}
+function editBadgeHtml(c) {
+  const sum = c.edit_summary;
+  const style = normEditStyle(sum?.style ? {edit_style: sum.style} : c);
+  const label = editStyleLabel(style);
+  if (c.status === "queued" || c.status === "rendering") {
+    return `<div class="clip-edit-row"><span class="clip-edit-badge muted">Edit: ${esc(label)}${style !== "off" && c.sound_fx !== false ? " + Sound" : ""}</span></div>`;
+  }
+  if (!sum) {
+    const pts = Array.isArray(c.edit_points) ? c.edit_points.length : 0;
+    if (style === "off") return `<div class="clip-edit-row"><span class="clip-edit-badge muted">Unedited · Off</span></div>`;
+    return `<div class="clip-edit-row"><span class="clip-edit-badge ${pts ? "applied" : "muted"}">${esc(label)}${pts ? ` · ${pts} edit${pts === 1 ? "" : "s"}` : ""}</span></div>`;
+  }
+  if (!sum.applied) {
+    const shortWhy = style === "off" ? "Unedited · Off" : "Unedited · Steady clip";
+    return `<div class="clip-edit-row"><span class="clip-edit-badge muted" title="${esc(sum.skipped_reason || "")}">${esc(shortWhy)}</span></div>`;
+  }
+  const pts = Array.isArray(c.edit_points) ? c.edit_points.length : (sum.treatments || []).filter(t => t.kind === "beat").length;
+  const jc = sum.jump_cut_count > 0 ? ` · ${sum.jump_cut_count} cut${sum.jump_cut_count === 1 ? "" : "s"}` : "";
+  const sfx = sum.sound_count > 0 ? ` + ${sum.sound_count} SFX` : "";
+  const fc = sum.facecam_safe ? ` · Facecam safe` : "";
+  return `<div class="clip-edit-row"><span class="clip-edit-badge applied">${esc(label)}${esc(jc)}${pts ? ` · ${pts} punch-in${pts === 1 ? "" : "s"}` : ""}${esc(sfx)}</span>${fc ? `<span class="clip-edit-badge">Facecam safe</span>` : ""}</div>`;
+}
+function editSummaryHtml(c, compact) {
+  const sum = c.edit_summary;
+  const style = normEditStyle(sum?.style ? {edit_style: sum.style} : c);
+  const label = editStyleLabel(style);
+  if (!sum && (c.status === "queued" || c.status === "rendering")) {
+    return compact ? "" : `<div class="edit-summary-box"><div class="es-title"><span>Editing report</span><span class="es-pill">${esc(label)}</span></div><div class="es-note">Applied edits and beat timestamps will appear here once rendering finishes.</div></div>`;
+  }
+  if (!sum) {
+    if (compact) return "";
+    return `<div class="edit-summary-box"><div class="es-title"><span>Editing report</span><span class="es-pill">${esc(label)}</span></div><div class="es-note">Rendered with an earlier version. Save and re-make to generate a full beat-by-beat edit report.</div></div>`;
+  }
+  const treatments = Array.isArray(sum.treatments) ? sum.treatments : [];
+  const signals = Array.isArray(sum.signals_used) ? sum.signals_used : [];
+  const rows = treatments.map(t => {
+    const at = typeof t.at === "number" ? `<span class="tcode">${fmt(t.at)}</span>` : `<span class="tcode">clip</span>`;
+    const who = t.detail ? `${t.label} — ${t.detail}` : t.label;
+    return `<li>${at}<span>${esc(who)}</span></li>`;
+  }).join("");
+  if (compact) {
+    if (!sum.applied) {
+      return `<details class="clip-edit-details"><summary><span>Why unedited?</span><span>▾</span></summary><p style="margin:0;line-height:1.45">${esc(sum.skipped_reason || "Editing was turned off for this clip.")}</p></details>`;
+    }
+    return `<details class="clip-edit-details"><summary><span>Applied edits (${treatments.length})</span><span>▾</span></summary>
+      <ul class="clip-edit-list">${rows}</ul></details>`;
+  }
+  if (!sum.applied) {
+    return `<div class="edit-summary-box">
+      <div class="es-title"><span>Last render: Unedited</span><span class="es-pill">${esc(label)}</span></div>
+      <div class="es-note">${esc(sum.skipped_reason || "No edits were applied to this render.")}</div>
+    </div>`;
+  }
+  return `<div class="edit-summary-box">
+    <div class="es-title"><span>Last render: ${esc(label)} applied</span><span class="es-pill">${treatments.length} treatment${treatments.length === 1 ? "" : "s"}</span></div>
+    ${sum.reason ? `<div class="es-note">${esc(sum.reason)}</div>` : ""}
+    <div class="es-pills">
+      ${signals.map(s => `<span class="es-pill">${esc(s.replace(/_/g, " "))}</span>`).join("")}
+      ${sum.facecam_safe ? `<span class="es-pill">Facecam PIP protected</span>` : ""}
+      ${sum.sound_count > 0 ? `<span class="es-pill">${sum.sound_count} sound accent${sum.sound_count === 1 ? "" : "s"}</span>` : `<span class="es-pill">No sound accents</span>`}
+    </div>
+    ${rows ? `<ul class="clip-edit-list" style="margin-top:4px">${rows}</ul>` : ""}
+  </div>`;
+}
+
 /* ============================================================ add bar */
 function drawAdd(variant) {
   const c = creator(), A = att();
+  const ed = curComposerEdit(A);
+  A.edit_style = ed.edit_style;
+  A.sound_fx = ed.sound_fx;
   $("#add").innerHTML = `<form class="composer ${variant === "hero" ? "big" : "compact"}" id="addform">
     <div class="composer-input">${ic("link")}<input id="url" placeholder="Paste a YouTube, Twitch or Kick video link" autocomplete="off" aria-label="Video link"></div>
     <label class="composer-guidance" for="o_instructions"><span>Special instructions <small>optional · helps the AI choose moments</small></span>
       <textarea id="o_instructions" rows="2" maxlength="500" placeholder="e.g. Focus on funny reactions; avoid spoilers">${esc(A.instructions || "")}</textarea></label>
+    <div class="composer-edit-strip" role="region" aria-label="Clip editing controls">
+      <input type="hidden" id="o_edit_style" value="${esc(ed.edit_style)}">
+      <input type="hidden" id="o_sound_fx" value="${ed.sound_fx ? "1" : "0"}">
+      <span class="composer-edit-label">Editing</span>
+      <div class="seg-edit" role="group" aria-label="Editing style">
+        ${EDIT_STYLE_LIST.map(k => `<button type="button" data-comp-edit="${k}" aria-pressed="${ed.edit_style === k}">${esc(editStyleLabel(k))}</button>`).join("")}
+      </div>
+      <button type="button" class="sfx-toggle" id="o_sfx_btn" data-act="togglecomp-sfx" aria-pressed="${ed.edit_style !== "off" && ed.sound_fx}" ${ed.edit_style === "off" ? "disabled" : ""} title="Play subtle sound accents on key moments">${sfxIconSvg()}<span>${ed.edit_style === "off" ? "Sound: Off" : (ed.sound_fx ? "Sound: On" : "Sound: Off")}</span></button>
+      <span class="composer-edit-desc" id="o_edit_desc">${esc(editStyleDesc(ed.edit_style))}</span>
+    </div>
     <div class="att" id="att"><div><div class="att-in" id="attIn"></div></div></div>
     <div class="composer-bar">
       <button type="button" class="chip" data-act="pickfile">${ic("up")}Upload video</button>
@@ -1466,7 +1834,7 @@ function drawAdd(variant) {
         ${stepper("o_maxlen", "Longest", c?.max_len ?? 60, 10, 180, 5, "s")}
       </div></div>
       <div class="ob wide"><div class="ot cap-head"><span>Framing and captions</span>
-        <button type="button" class="lnk" data-act="openpick" style="border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--brand-deep);cursor:pointer;padding:0">Choose them with a preview &rsaquo;</button></div>
+        <button type="button" class="lnk" data-act="openpick" style="border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;padding:0">Choose them with a preview &rsaquo;</button></div>
         <p class="sub" style="margin:0;font-size:12px">Picked before every batch, on the video itself: the framing (blurred fill, zoomed, fill screen, gameplay with the webcam) and the caption style.</p></div>
       <div class="ob"><div class="ot">Video quality</div><input type="hidden" id="o_quality" value="720"><div class="seg" role="group" aria-label="Video quality">
         <button type="button" data-seg="o_quality" data-v="720" aria-pressed="true">720p<small>Fast</small></button>
@@ -1524,10 +1892,13 @@ document.addEventListener("keydown", e => {
 });
 const targetCreator = () => creatorId() || $("#o_creator")?.value || "";
 function jobOptions() {
-  const n = id => { const v = $(id).value; return v === "" ? null : Number(v); };
+  const n = id => { const v = $(id)?.value; return v === "" || v == null ? null : Number(v); };
   // The framing, the caption style and whether there are captions are chosen in the chooser, which is what the
-  // person sees before anything is made; only the numbers and the part of the video come from this panel.
+  // person sees before anything is made; editing style and sound accents are also visible right on the composer.
+  const edStyle = normEditStyle({edit_style: $("#o_edit_style")?.value || att().edit_style});
+  const sfx = $("#o_sound_fx") ? $("#o_sound_fx").value !== "0" : (att().sound_fx !== false);
   const o = {max_clips:n("#o_max"), min_len:n("#o_min"), max_len:n("#o_maxlen"), quality:n("#o_quality"),
+    edit_style: edStyle, auto_edit: edStyle !== "off", sound_fx: sfx,
     instructions:att().instructions?.trim() || ""};
   if (n("#o_from") !== null) o.range_start = n("#o_from") * 60;
   if (n("#o_to") !== null) o.range_end = n("#o_to") * 60;
@@ -1603,12 +1974,15 @@ function drawLookBar() {
   const d = {...pickDefaults(A), ...(S.lastPick || {})};
   const chosen = !!S.lastPick;
   const caps = d.captions !== false;
+  const edStyle = normEditStyle(A.edit_style ? A : d);
+  const sfx = typeof A.sound_fx === "boolean" ? A.sound_fx : (d.sound_fx !== false);
   const layTxt = LAYOUT_SHORT[d.layout] || d.layout, styTxt = S.status?.styles?.[d.style] || LOOK_STYLES[d.style] || d.style;
-  const h = `<button type="button" class="look-btn" data-act="openpick" aria-label="Change the framing and caption style">
+  const edTxt = editStyleLabel(edStyle) + (edStyle !== "off" && sfx ? " + Sound" : "");
+  const h = `<button type="button" class="look-btn" data-act="openpick" aria-label="Change the framing, caption and editing style">
       <span class="lay-prev ${esc(d.layout)}" style="height:34px;width:22px"><span class="ph" style="width:18px;height:32px"><i></i></span></span>
-      <span class="look-tx"><b>${esc(layTxt)}</b><em>${caps ? esc(styTxt) + " captions" : "No captions"}</em></span>
-      <span class="look-edit">${chosen ? "Change" : "Choose"}</span></button>
-    ${chosen ? "" : `<span class="look-note">Pick these before clipping &mdash; you will see them on the video.</span>`}`;
+      <span class="look-tx"><b>${esc(layTxt)}</b><em>${caps ? esc(styTxt) + " captions" : "No captions"} · Edit: ${esc(edTxt)}</em></span>
+      <span class="look-edit">${chosen ? "Change" : "Preview"}</span></button>
+    ${chosen ? "" : `<span class="look-note">Preview framing, captions &amp; editing before clipping starts.</span>`}`;
   if (box.innerHTML !== h) box.innerHTML = h;
 }
 
@@ -1792,9 +2166,15 @@ function pickDefaults(A) {
   let kept = {};
   try { kept = (JSON.parse(localStorage.getItem("anhy_look") || "{}"))[key] || {}; } catch {}
   const last = {...(S.lastPick || {})};                // this session's choice, for any creator
+  const cStyle = normEditStyle(c);
   const fallback = {style: c?.style ?? "bounce", layout: c?.layout ?? "blur", captions: c?.captions !== false,
-                    auto_edit: true, sound_fx: true, max_clips: c?.max_clips ?? 6};
+                    edit_style: cStyle, auto_edit: cStyle !== "off", sound_fx: c?.sound_fx !== false,
+                    max_clips: c?.max_clips ?? 6};
   const got = {...fallback, ...kept, ...last};
+  if (A && A.edit_style) got.edit_style = normEditStyle(A);
+  else got.edit_style = normEditStyle(got);
+  got.auto_edit = got.edit_style !== "off";
+  if (A && typeof A.sound_fx === "boolean") got.sound_fx = A.sound_fx;
   const box = $("#o_max");                             // "How many" in the Options panel
   if (box?.dataset.touched && Number(box.value) > 0) {  // only when it was changed there, not just filled in
     got.max_clips = Number(box.value);
@@ -1901,9 +2281,11 @@ function drawLook() {
 
 function pickState() {
   const dlg = $("#pickdlg");
+  const edit_style = normEditStyle({edit_style: dlg.querySelector("#p_edit_style")?.value || "pro"});
   return {style: dlg.querySelector("#p_style")?.value || "bounce", layout: dlg.querySelector("#p_layout")?.value || "blur",
           captions: dlg.querySelector("#p_caps")?.checked !== false,
-          auto_edit: dlg.querySelector("#p_autoedit")?.checked !== false,
+          edit_style,
+          auto_edit: edit_style !== "off",
           sound_fx: dlg.querySelector("#p_soundfx")?.checked !== false,
           max_clips: Number(dlg.querySelector("#p_max")?.value) || 6};
 }
@@ -1911,6 +2293,7 @@ function pickState() {
 function drawPick(opts, A) {
   const dlg = $("#pickdlg");
   const src = pickSource(A);
+  const edStyle = normEditStyle(opts);
   // The page's own lists, unless they never arrived (which is the case for a moment after a reload).
   const styles = Object.keys(S.status?.styles || {}).length ? Object.keys(S.status.styles) : Object.keys(LOOK_STYLES);
   const layouts = Object.keys(S.status?.layouts || {}).length ? Object.keys(S.status.layouts) : Object.keys(LOOK_LAYOUTS);
@@ -1921,19 +2304,27 @@ function drawPick(opts, A) {
   const n = A.files.length + (A.locals || []).length + A.links.filter(l => l.state === "ok").length;
   dlg.innerHTML = `<form method="dialog" class="pd"><div>
       <h2>Choose the look before clipping</h2>
-      <p class="pd-sub">${n === 1 ? "Pick these now, so the clips come out the way you want them the first time."
-        : `The same look is used for all ${n} videos in this batch, so nothing is made the wrong shape.`}</p></div>
+      <p class="pd-sub">${n === 1 ? "Pick framing, captions, and editing intensity before rendering starts."
+        : `The same look and editing style will be used for all ${n} videos in this batch.`}</p></div>
     <div><h3>Framing</h3><div class="pd-grid">${layouts.map(lay).join("")}</div></div>
     <div><h3>Caption style</h3>
       <label class="sw" style="margin-bottom:10px"><input type="checkbox" id="p_caps" ${opts.captions ? "checked" : ""}>Generate captions</label>
       <div class="pd-grid caps">${styles.map(sty).join("")}</div></div>
-    <div><h3>Automatic editing</h3><p class="pd-sub">Subtle punch-in zooms and color lifts on spoken highlights. If there is no clear moment, the video stays steady.</p>
-      <label class="sw"><input type="checkbox" id="p_autoedit" ${opts.auto_edit !== false ? "checked" : ""}>Emphasize key moments</label>
-      <label class="sw"><input type="checkbox" id="p_soundfx" ${opts.sound_fx !== false ? "checked" : ""}>Quiet whoosh on those moments</label></div>
+    <div class="edit-panel-box">
+      <div class="edit-panel-head">
+        <b>Automatic editing</b>
+        <div class="seg-edit" role="group" aria-label="Editing style">
+          ${EDIT_STYLE_LIST.map(k => `<button type="button" data-pick-edit="${k}" aria-pressed="${edStyle === k}">${esc(editStyleLabel(k))}</button>`).join("")}
+        </div>
+      </div>
+      <div class="edit-panel-desc" id="p_edit_desc">${esc(editStyleDesc(edStyle))}</div>
+      <label class="sw" style="margin:0"><input type="checkbox" id="p_soundfx" ${opts.sound_fx !== false ? "checked" : ""} ${edStyle === "off" ? "disabled" : ""}>Subtle sound accents on peak moments</label>
+      <input type="hidden" id="p_edit_style" value="${esc(edStyle)}">
+    </div>
     <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
       <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
         <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status?.styles?.[opts.style] || LOOK_STYLES[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
-        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--brand-ink);display:${opts.layout === "gameplay" ? "" : "none"}">A webcam is only found in a stream recording. Anything else fills the screen instead.</p></div></div>
+        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${opts.layout === "gameplay" ? "" : "none"}">Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.</p></div></div>
     <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
       ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
     <div class="pd-foot"><span class="hint">Change any of this later on each clip.</span><span class="grow"></span>
@@ -1957,7 +2348,9 @@ function openPick(A) {
       const got = ok ? {...pickState(), captions: dlg.querySelector("#p_caps")?.checked !== false} : null;
       if (ok) {
         S.lastPick = {style: got.style, layout: got.layout, captions: got.captions,
-                      auto_edit: got.auto_edit, sound_fx: got.sound_fx, max_clips: got.max_clips};
+                      edit_style: got.edit_style, auto_edit: got.auto_edit,
+                      sound_fx: got.sound_fx, max_clips: got.max_clips};
+        syncComposerEditUI(got.edit_style, got.sound_fx);
         try {
           const all = JSON.parse(localStorage.getItem("anhy_look") || "{}");
           all[targetCreator() || "none"] = S.lastPick;
@@ -1973,9 +2366,18 @@ function openPick(A) {
   });
 }
 
-/* clicks and changes inside the chooser: framing, style, captions, the number of clips */
+/* clicks and changes inside the chooser: framing, style, captions, editing style, the number of clips */
 document.addEventListener("click", e => {
   const dlg = $("#pickdlg"); if (!dlg || !dlg.open || !dlg.contains(e.target)) return;
+  const pe = e.target.closest("[data-pick-edit]");
+  if (pe) {
+    const val = pe.dataset.pickEdit;
+    const h = dlg.querySelector("#p_edit_style"); if (h) h.value = val;
+    dlg.querySelectorAll("[data-pick-edit]").forEach(b => b.setAttribute("aria-pressed", String(b === pe)));
+    const desc = dlg.querySelector("#p_edit_desc"); if (desc) desc.textContent = editStyleDesc(val);
+    const sfx = dlg.querySelector("#p_soundfx"); if (sfx) sfx.disabled = val === "off";
+    return;
+  }
   const lay = e.target.closest("[data-layout]");
   if (lay) {
     dlg.querySelector("#p_layout").value = lay.dataset.layout;
@@ -2221,8 +2623,11 @@ function postPills(c) {
   return Object.values(c.posts || {}).filter(p => p.status !== "cancelled").map(p => {
     const cls = p.status === "posted" ? "ok" : p.status === "failed" ? "bad" : "warn";
     const said = p.status === "scheduled" ? clock(p.due_at) : p.status === "sent" ? "sent, waiting on Buffer" : p.status;
-    const txt = `${esc(p.account_name)} · ${said}`;
-    return p.url ? `<a class="pill ${cls}" href="${esc(p.url)}" target="_blank" rel="noopener">${txt}</a>` : `<span class="pill ${cls}" title="${esc(p.error || "")}">${txt}</span>`;
+    const tags = Array.isArray(p.instagram_tags) && p.instagram_tags.length ? p.instagram_tags : [];
+    const tagTxt = tags.length ? ` · tagged ${tags.map(u => "@" + u).join(", ")}` : "";
+    const txt = `${esc(p.account_name)} · ${said}${tags.length ? ` · @${esc(tags[0])}${tags.length > 1 ? ` +${tags.length - 1}` : ""}` : ""}`;
+    const tip = [p.error || "", tagTxt ? tagTxt.slice(3) : ""].filter(Boolean).join(" — ");
+    return p.url ? `<a class="pill ${cls}" href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(tip)}">${txt}</a>` : `<span class="pill ${cls}" title="${esc(tip)}">${txt}</span>`;
   }).join("");
 }
 function clipHtml(j, c) {
@@ -2237,6 +2642,8 @@ function clipHtml(j, c) {
     <div class="clip-body">
       <div class="hook">${esc(c.hook || "Untitled clip")}</div>
       <div class="ttl">${esc(c.title)}</div>
+      ${editBadgeHtml(c)}
+      ${editSummaryHtml(c, true)}
       ${postPills(c) ? `<div class="row" style="gap:4px">${postPills(c)}</div>` : ""}
       <div class="clip-foot">
         ${busyClip ? "" : `<label class="selck" title="Select this clip"><input type="checkbox" data-sel="${key}" ${sel().has(key) ? "checked" : ""} aria-label="Select this clip"></label>`}
@@ -2407,10 +2814,12 @@ function drawCreatorForm() {
         <label class="f">Minimum gap between live clips (minutes)<input data-k="min_gap_min" type="number" min="0" max="60" value="${c.min_gap_min}"></label>
         <label class="f span">Always clip the last 30 seconds when someone says<input data-k="trigger_words" value="${esc(c.trigger_words)}" placeholder="clip that, clip it"><small class="sub" style="font-weight:400">Separate phrases with commas. Matched on the transcript, so it needs no AI call.</small></label>
       </div></div>
-    <div class="card"><h2>Clips</h2><p class="help">How this creator's clips look.</p>
+    <div class="card"><h2>Clips</h2><p class="help">How this creator's clips look and get edited by default.</p>
       <div class="fields"><label class="sw span"><input type="checkbox" data-k="captions" data-caption-toggle ${c.captions === false ? "" : "checked"}>Generate captions</label>
         <label class="f">Caption style<select data-k="style" data-caption-style ${c.captions === false ? "disabled" : ""}>${opts(S.status.styles, c.style)}</select></label>
         <label class="f">Layout<select data-k="layout">${opts(S.status.layouts, c.layout)}</select></label>
+        <label class="f">Default editing style<select data-k="edit_style">${opts({off:"Off — raw cut", balanced:"Balanced — studio voice & clean punch-ins", pro:"Pro — jump-cuts, multi-cam, climax hits & film grade", energetic:"Energetic — tightest pacing, 1.38x snap zooms & full SFX"}, normEditStyle(c))}</select><small class="sub" style="font-weight:400">Used for automatic live clips and as the default when uploading for this creator.</small></label>
+        <label class="sw" style="align-self:end;padding-bottom:6px"><input type="checkbox" data-k="sound_fx" ${c.sound_fx === false ? "" : "checked"}>Subtle sound accents on peaks</label>
         <label class="f">Game<input data-k="game" value="${esc(c.game || "")}" placeholder="Read from the title"><small class="sub" style="font-weight:400">Left empty, the game is read from the stream's title. Set it for a streamer whose title says nothing: GTA 6, Fortnite, Elden Ring.</small></label>
         <label class="f">Shortest clip (seconds)<input data-k="min_len" type="number" value="${c.min_len}"></label>
         <label class="f">Longest clip (seconds)<input data-k="max_len" type="number" value="${c.max_len}"></label>
@@ -2724,15 +3133,27 @@ function drawClipDlg(full) {
     : c.status === "error" ? `<div class="err" style="padding:20px;text-align:center">${esc(c.error || "Could not make this clip.")}</div>`
     : `<span class="making">${c.status === "rendering" ? "Making this clip…" : "Waiting its turn…"}</span>`;
   if (full) {
+    const edStyle = normEditStyle(c);
     dlg.innerHTML = `<div class="editor"><div class="stage" id="stage">${stage}</div>
       <div class="panel">
         <div class="job-head" style="margin:0"><div><span class="badge ${scoreCls(c.score)}" style="position:static">${c.judges ? "Words " + c.judges.words + (c.judges.reaction ? " · Reaction " + c.judges.reaction : "") : c.score ? "Score " + c.score : "Clipped by hand"}</span>
           <p class="sub" style="margin-top:8px">${esc(c.reason || "")}</p></div><button class="btn icon ghost" data-act="closedlg" aria-label="Close">${ic("x")}</button></div>
+        <h3>Editing &amp; sound</h3>
+        <div class="edit-panel-box">
+          <div class="edit-panel-head">
+            <b>Editing style</b>
+            <div class="seg-edit" role="group" aria-label="Clip editing style">
+              ${EDIT_STYLE_LIST.map(k => `<button type="button" data-dlg-edit="${k}" aria-pressed="${edStyle === k}">${esc(editStyleLabel(k))}</button>`).join("")}
+            </div>
+          </div>
+          <div class="edit-panel-desc" id="dlg_edit_desc">${esc(editStyleDesc(edStyle))}</div>
+          <label class="sw" style="margin:0"><input type="checkbox" id="dlg_sound_fx" data-f="sound_fx" ${c.sound_fx === false ? "" : "checked"} ${edStyle === "off" ? "disabled" : ""}>Subtle sound accents on peak moments</label>
+          <input type="hidden" id="dlg_edit_style" data-f="edit_style" value="${esc(edStyle)}">
+          <div id="dlg_edit_summary">${editSummaryHtml(c, false)}</div>
+        </div>
         <h3>On the video</h3>
         <label class="f">Big text<input data-f="hook" value="${esc(c.hook)}"></label>
         <label class="sw"><input type="checkbox" data-f="captions" data-caption-toggle ${c.captions === false ? "" : "checked"}>Generate captions</label>
-        <label class="sw"><input type="checkbox" data-f="auto_edit" ${c.auto_edit === false ? "" : "checked"}>Emphasize spoken highlights with subtle zooms</label>
-        <label class="sw"><input type="checkbox" data-f="sound_fx" ${c.sound_fx === false ? "" : "checked"}>Quiet whoosh on highlights</label>
         <div class="two"><label class="f">Caption style<select data-f="style" data-caption-style ${c.captions === false ? "disabled" : ""}>${opts(S.status.styles, c.style)}</select></label>
           <label class="f">Layout<select data-f="layout">${opts(S.status.layouts, c.layout)}</select></label></div>
         <div class="two"><label class="f">Start (seconds)<input data-f="start" type="number" step="0.5" value="${c.start}"></label>
@@ -2742,17 +3163,27 @@ function drawClipDlg(full) {
         <label class="f">Title<input data-f="title" value="${esc(c.title || "")}"></label>
         <label class="f">Social caption<textarea data-f="description" rows="3">${esc(c.description || "")}</textarea></label>
         <label class="f">Hashtags<input data-f="hashtags" value="${esc((c.hashtags || []).map(h => "#" + h).join(" "))}" placeholder="#StreamClips #Highlights"></label>
-        <button class="btn" data-act="remake">${ic("scissors")}Save and re-make clip</button>
+        <button class="btn primary" data-act="remake">${ic("scissors")}Save and re-make clip</button>
         <h3>Post it</h3>
         <div id="dposts" class="row" style="gap:4px"></div>
         ${S.accounts.length ? `<div class="row">${S.accounts.map(a => `<label class="ck"><input type="checkbox" data-pacc value="${esc(a.id)}">${esc(a.label)} · ${esc(a.name)}</label>`).join("")}</div>
+          <div class="ig-tag-box" id="dlg_ig_wrap" hidden>
+            <label class="f" style="margin:0">Tag Instagram usernames <small class="sub" style="font-weight:400">(optional)</small>
+              <input id="dlg_ig_tags" value="${esc((c.instagram_tags || []).map(u => "@" + u).join(", "))}" placeholder="@creator, @friend" autocomplete="off" spellcheck="false">
+            </label>
+            <span class="sub" style="font-size:12px">You can also confirm or edit tagged usernames right before posting.</span>
+          </div>
           <div class="row"><button class="btn primary" data-act="postnow">${ic("send")}Post now</button><button class="btn" data-act="postqueue">Add to queue</button></div>`
           : `<p class="help">No accounts connected yet. Connect one in Settings.</p>`}
         <div class="row" style="margin-top:auto;padding-top:8px;border-top:1px solid var(--line)">
           ${c.status === "done" ? `<a class="btn" href="${m}${esc(c.file)}?download=1">${ic("down")}Download</a>` : ""}
           <button class="btn" data-act="copy" data-j="${j.id}" data-c="${esc(c.id)}">${ic("copy")}Copy post text</button></div>
       </div></div>`;
-  } else if (D.sig !== sig) $("#stage").innerHTML = stage;
+  } else if (D.sig !== sig) {
+    $("#stage").innerHTML = stage;
+    const sb = $("#dlg_edit_summary");
+    if (sb) sb.innerHTML = editSummaryHtml(c, false);
+  }
   D.sig = sig;
   put($("#dposts"), postPills(c));
 }
@@ -3088,20 +3519,155 @@ document.addEventListener("click", async e => {
       if (!await ask("Disconnect this account?", "Posts still waiting for it will fail.", "Disconnect", true)) return;
       await api(`/api/accounts/${d.id}`, {method:"DELETE"}); await tick(); return drawSettings();
     }
+    if (a === "togglecomp-sfx") {
+      const style = normEditStyle({edit_style: $("#o_edit_style")?.value || att().edit_style});
+      if (style === "off") return;
+      const cur = $("#o_sound_fx")?.value !== "0";
+      syncComposerEditUI(style, !cur);
+      return;
+    }
     if (a === "remake") {
       const body = {}; $$("#clipdlg [data-f]").forEach(i => {
         body[i.dataset.f] = i.type === "checkbox" ? i.checked : i.type === "number" ? Number(i.value) : i.value;
       });
+      if (body.edit_style) body.auto_edit = body.edit_style !== "off";
       await send(`/api/jobs/${D.jid}/clips/${D.cid}/render`, body); toast("Re-making the clip…", "ok"); return tick();
     }
     if (a === "postnow" || a === "postqueue") {
       const accs = $$("#clipdlg [data-pacc]:checked").map(i => i.value);
       if (!accs.length) return toast("Tick at least one account first.", "bad");
-      if (a === "postnow" && !await ask("Post now?", `This clip goes to ${accs.length} account${accs.length > 1 ? "s" : ""} straight away.`, "Post now")) return;
-      await send("/api/posts", {job:D.jid, clip:D.cid, accounts:accs, now:a === "postnow"});
-      toast(a === "postnow" ? "Posting now" : "Added to the queue", "ok"); return tick();
+      const picked = accs.map(id => S.accounts.find(x => x.id === id)).filter(Boolean);
+      const igAccs = picked.filter(isInstagramAcc);
+      let instagram_tags = [];
+      if (igAccs.length) {
+        const inlineVal = $("#dlg_ig_tags")?.value || "";
+        const res = await askInstagramTags({igAccs, totalCount: accs.length, isNow: a === "postnow", initial: inlineVal});
+        if (!res) return;
+        instagram_tags = res.tags;
+        if ($("#dlg_ig_tags")) $("#dlg_ig_tags").value = instagram_tags.map(u => "@" + u).join(", ");
+      } else if (a === "postnow" && !await ask("Post now?", `This clip goes to ${accs.length} account${accs.length > 1 ? "s" : ""} straight away.`, "Post now")) {
+        return;
+      }
+      await send("/api/posts", {job:D.jid, clip:D.cid, accounts:accs, now:a === "postnow", instagram_tags});
+      toast(a === "postnow" ? (instagram_tags.length ? `Posting now · tagging ${instagram_tags.map(u => "@" + u).join(", ")}` : "Posting now")
+                            : (instagram_tags.length ? `Added to the queue · tagging ${instagram_tags.map(u => "@" + u).join(", ")}` : "Added to the queue"), "ok");
+      return tick();
     }
   } catch (err) { b.disabled = false; toast(err.message, "bad"); }
+});
+
+function isInstagramAcc(a) {
+  if (!a) return false;
+  return a.platform === "instagram"
+    || (a.platform === "buffer" && (a.service === "instagram" || /instagram/i.test(a.detail || "")));
+}
+function parseIgTagsClient(raw) {
+  const parts = String(raw || "").trim().split(/[\s,;]+/).filter(Boolean);
+  const tags = [], seen = new Set(), bad = [];
+  for (const token of parts) {
+    const u = token.replace(/^@+/, "").trim();
+    if (!u) continue;
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(u) || u.startsWith(".") || u.endsWith(".") || u.includes("..")) {
+      bad.push(token);
+      continue;
+    }
+    const key = u.toLowerCase();
+    if (!seen.has(key) && tags.length < 20) { seen.add(key); tags.push(u); }
+  }
+  return {tags, bad};
+}
+function askInstagramTags({igAccs, totalCount, isNow, initial}) {
+  return new Promise(res => {
+    const d = $("#formdlg");
+    const hasBufferIg = igAccs.some(a => a.platform === "buffer");
+    const hasDirectIg = igAccs.some(a => a.platform === "instagram");
+    const names = igAccs.map(a => a.name).join(", ");
+    const okLabel = isNow ? "Post now" : "Add to queue";
+    const note = hasBufferIg && !hasDirectIg
+      ? "Buffer posts include tagged usernames as @mentions in your caption."
+      : hasBufferIg && hasDirectIg
+        ? "Direct Instagram tags usernames on the Reel; Buffer adds them as @mentions."
+        : "Tagged public accounts are added directly to this Instagram Reel.";
+    d.innerHTML = `<form method="dialog" class="dlg">
+      <h2>Tag usernames on Instagram</h2>
+      <p class="help">Posting to <b>${esc(names)}</b>${totalCount > igAccs.length ? ` and ${totalCount - igAccs.length} other account${totalCount - igAccs.length > 1 ? "s" : ""}` : ""}. Enter Instagram usernames to tag before it goes to posting, or leave blank to skip.</p>
+      <label class="f">Instagram usernames <small class="sub" style="font-weight:400">(optional, up to 20)</small>
+        <input id="ig_tag_input" value="${esc(initial || "")}" placeholder="@creator, @friend" autocomplete="off" spellcheck="false" autofocus>
+      </label>
+      <div class="ig-tag-chips" id="ig_tag_chips"></div>
+      <p class="ig-tag-err" id="ig_tag_err" hidden></p>
+      <p class="sub" style="font-size:12px">${esc(note)}</p>
+      <div class="dlg-foot">
+        <button class="btn" value="no" formnovalidate>Cancel</button>
+        <button class="btn primary" value="yes" id="ig_tag_ok">${ic("send")}${esc(okLabel)}</button>
+      </div>
+    </form>`;
+    const inp = $("#ig_tag_input"), chips = $("#ig_tag_chips"), err = $("#ig_tag_err"), ok = $("#ig_tag_ok");
+    const refresh = () => {
+      const {tags, bad} = parseIgTagsClient(inp.value);
+      chips.innerHTML = tags.map(u => `<span class="ig-tag-chip">@${esc(u)}</span>`).join("");
+      if (bad.length) {
+        err.textContent = `Invalid Instagram username: ${bad[0]}. Use letters, numbers, dots or underscores (max 30 chars).`;
+        err.hidden = false;
+        ok.disabled = true;
+      } else {
+        err.hidden = true;
+        ok.disabled = false;
+      }
+    };
+    inp.addEventListener("input", refresh);
+    refresh();
+    d.onclose = () => {
+      if (d.returnValue !== "yes") return res(null);
+      const {tags, bad} = parseIgTagsClient(inp.value);
+      res(bad.length ? null : {tags});
+    };
+    d.returnValue = "no";
+    d.showModal();
+    inp.focus();
+  });
+}
+
+document.addEventListener("change", e => {
+  if (e.target.matches?.("#clipdlg [data-pacc]")) {
+    const wrap = $("#dlg_ig_wrap");
+    if (!wrap) return;
+    const anyIg = $$("#clipdlg [data-pacc]:checked").some(i => isInstagramAcc(S.accounts.find(x => x.id === i.value)));
+    wrap.hidden = !anyIg;
+  }
+});
+
+document.addEventListener("click", e => {
+  const ce = e.target.closest("[data-comp-edit]");
+  if (ce) {
+    const nextStyle = ce.dataset.compEdit;
+    const curSfx = $("#o_sound_fx") ? $("#o_sound_fx").value !== "0" : (att().sound_fx !== false);
+    syncComposerEditUI(nextStyle, curSfx);
+    return;
+  }
+  const de = e.target.closest("[data-dlg-edit]");
+  if (de) {
+    const nextStyle = de.dataset.dlgEdit;
+    const h = $("#dlg_edit_style"); if (h) h.value = nextStyle;
+    $$("[data-dlg-edit]").forEach(b => b.setAttribute("aria-pressed", String(b === de)));
+    const desc = $("#dlg_edit_desc"); if (desc) desc.textContent = editStyleDesc(nextStyle);
+    const sfx = $("#dlg_sound_fx"); if (sfx) sfx.disabled = nextStyle === "off";
+    return;
+  }
+});
+
+$("#studioThemeBtn")?.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  document.documentElement.classList.toggle("dark", next === "dark");
+  try { localStorage.setItem("anhy-theme", next); } catch {}
+  if (S.view === "overview" && $("#appAscii") && window.GradientASCII) {
+    if (window._gaStop) { window._gaStop(); window._gaStop = null; }
+    try {
+      const isDark = next === "dark";
+      window._gaStop = GradientASCII($("#appAscii"), {colors: isDark ? ["#27272a", "#111114", "#1c1c21", "#18181c", "#0c0c0f"] : ["#e4e4e7", "#ffffff", "#f4f4f5", "#fafafa", "#f4f4f5"], shape: "horizon", lightMode: !isDark, cellSize: 16, density: 0.72, glyphOpacity: 0.18, gradientOpacity: 0.22, glow: 0.02, grain: 0.04, mouseInteraction: false, clickEffect: "none"});
+    } catch {}
+  }
 });
 
 $("#collapseBtn").innerHTML = ic("sidebar"); $("#menuBtn").innerHTML = ic("menu");
@@ -3124,13 +3690,24 @@ $("#main").addEventListener("scroll", () => $(".topbar").classList.toggle("stuck
   { const [v, tab] = location.pathname.startsWith("/app/") ? fromPath(location.pathname) : ["overview", "clips"]; go(v, tab, true); remember(S.view, S.ctab, "replace"); }
   try {  // a link pasted on the home page before signing up
     const link = sessionStorage.getItem("anhy_link") || sessionStorage.getItem("peakcut_link");
+    const savedStyle = sessionStorage.getItem("anhy_edit_style");
+    const savedSfx = sessionStorage.getItem("anhy_sound_fx");
+    if (savedStyle && EDIT_STYLE_LIST.includes(savedStyle)) {
+      const sfxBool = savedSfx == null ? true : savedSfx !== "0";
+      syncComposerEditUI(savedStyle, sfxBool);
+    }
     if (link) {
       const instructions = sessionStorage.getItem("anhy_instructions") || "";
-      for (const k of ["anhy_link", "peakcut_link", "anhy_instructions"]) sessionStorage.removeItem(k);
+      for (const k of ["anhy_link", "peakcut_link", "anhy_instructions", "anhy_edit_style", "anhy_sound_fx"]) sessionStorage.removeItem(k);
       go("overview"); att().instructions = instructions.slice(0, 500);
+      if (savedStyle && EDIT_STYLE_LIST.includes(savedStyle)) {
+        syncComposerEditUI(savedStyle, savedSfx == null ? true : savedSfx !== "0");
+      }
       $("#o_instructions").value = att().instructions;
       $("#url").value = link; onLink($("#url")); $("#url").focus();
       toast("Your link is ready. Choose the look and make clips.", "ok");
+    } else if (savedStyle) {
+      for (const k of ["anhy_edit_style", "anhy_sound_fx"]) sessionStorage.removeItem(k);
     }
   } catch {}
   loop();

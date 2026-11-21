@@ -302,7 +302,8 @@ def get(aid):
 
 
 def list_accounts() -> list:
-    return [{"id": a["id"], "platform": a["platform"], "label": PLATFORM_NAMES[a["platform"]], "name": a["name"],
+    return [{"id": a["id"], "platform": a["platform"], "service": a.get("service", ""),
+             "label": PLATFORM_NAMES[a["platform"]], "name": a["name"],
              "added": a["added"], "detail": a.get("detail", "")} for a in _all()]
 
 
@@ -436,19 +437,80 @@ def _ig_token(acc) -> str:
     return acc["token"]
 
 
-def instagram_upload(acc, path: Path, caption: str, job_id: str = ""):
+_IG_USER_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+
+
+def parse_instagram_tags(raw, strict: bool = False) -> list:
+    """Normalize Instagram usernames to tag on a Reel (no leading @, deduped, max 20).
+    When strict=True, raises ValueError if any entered token is not a valid Instagram username."""
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        parts = re.split(r"[\s,;]+", raw.strip())
+    elif isinstance(raw, (list, tuple)):
+        parts = []
+        for item in raw:
+            parts.extend(re.split(r"[\s,;]+", str(item or "").strip()))
+    else:
+        if strict:
+            raise ValueError("Instagram usernames must be text or a list of usernames.")
+        return []
+    out, seen = [], set()
+    for token in parts:
+        u = token.strip().lstrip("@").strip()
+        if not u:
+            continue
+        if not _IG_USER_RE.fullmatch(u) or u.startswith(".") or u.endswith(".") or ".." in u:
+            if strict:
+                raise ValueError(f"'{token}' is not a valid Instagram username. Use letters, numbers, dots or underscores (max 30 characters).")
+            continue
+        key = u.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(u)
+            if len(out) >= 20:
+                break
+    return out
+
+
+def clean_instagram_tags(raw) -> list:
+    return parse_instagram_tags(raw, strict=False)
+
+
+def _append_ig_mentions(text: str, tags: list) -> str:
+    """Append @mentions for usernames not already mentioned in the caption (used by Buffer Instagram posts)."""
+    clean = clean_instagram_tags(tags)
+    if not clean:
+        return text
+    existing = {m.lower() for m in re.findall(r"@([A-Za-z0-9._]{1,30})", text or "")}
+    missing = [f"@{u}" for u in clean if u.lower() not in existing]
+    if not missing:
+        return text
+    base = (text or "").rstrip()
+    return f"{base}\n\n{' '.join(missing)}" if base else " ".join(missing)
+
+
+def instagram_upload(acc, path: Path, caption: str, job_id: str = "", user_tags=None):
     """A Reel. On a public site Instagram fetches the clip from a one-hour signed link; on a computer it cannot
     reach, the file is sent instead (only possible for some app types)."""
     token = _ig_token(acc)
     auth = {"Authorization": f"Bearer {token}"}
     uid = acc["user_id"]
+    tags = clean_instagram_tags(user_tags)
+    tag_payload = json.dumps([{"username": u, "x": 0.5, "y": 0.5} for u in tags]) if tags else ""
     if config.PUBLIC_URL.startswith("https://") and job_id:
-        box = _check(httpx.post(f"{IG}/{uid}/media", data={"media_type": "REELS", "video_url": clip_link(job_id, path.name),
-                                                           "caption": caption[:2200], "share_to_feed": "true"},
+        form = {"media_type": "REELS", "video_url": clip_link(job_id, path.name),
+                "caption": caption[:2200], "share_to_feed": "true"}
+        if tag_payload:
+            form["user_tags"] = tag_payload
+        box = _check(httpx.post(f"{IG}/{uid}/media", data=form,
                                 headers=auth, timeout=60), "Starting the Instagram post").json()
     else:
-        box = _check(httpx.post(f"{IG}/{uid}/media", data={"media_type": "REELS", "upload_type": "resumable",
-                                                           "caption": caption[:2200], "share_to_feed": "true"},
+        form = {"media_type": "REELS", "upload_type": "resumable",
+                "caption": caption[:2200], "share_to_feed": "true"}
+        if tag_payload:
+            form["user_tags"] = tag_payload
+        box = _check(httpx.post(f"{IG}/{uid}/media", data=form,
                                 headers=auth, timeout=60), "Starting the Instagram upload").json()
         with path.open("rb") as f:
             _check(httpx.post(f"{IG_UPLOAD}/{box['id']}", content=f.read(),
@@ -834,7 +896,7 @@ def _buffer_meta(acc, title: str, privacy: str) -> dict:
     return {}
 
 
-def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "", privacy: str = "public"):
+def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "", privacy: str = "public", user_tags=None):
     """Send one clip to one Buffer channel, to go out at once. (Buffer's post id, its link on the network if it has
     one yet.) Buffer fetches the clip from a signed link here, which is why the post is sent now rather than left
     in Buffer's queue: a queued post can go out days later, long after the link has expired.
@@ -851,7 +913,8 @@ def buffer_upload(acc, path: Path, text: str, title: str = "", job_id: str = "",
     if not path.is_file():
         raise RuntimeError("The clip's file is not on this server any more.")
     link = clip_link(job_id, path.name, seconds=BUF_LINK_HOURS * 3600)
-    body = {"text": _buffer_text(text, acc.get("service", "")), "channelId": acc["channel"],
+    post_text = _append_ig_mentions(text, user_tags) if acc.get("service") == "instagram" and user_tags else text
+    body = {"text": _buffer_text(post_text, acc.get("service", "")), "channelId": acc["channel"],
             "schedulingType": "automatic", "mode": "shareNow",
             "assets": [{"video": {"url": link, "metadata": {"thumbnailOffset": 1000}}}]}
     meta = _buffer_meta(acc, title, privacy)

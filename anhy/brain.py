@@ -67,10 +67,10 @@ Rules:
 - hashtags: 3 to 5 relevant, searchable tags without #. Mix the exact game/subject (if known) with the kind of
   moment (e.g. clutch, reaction, story). Only tag what is actually in the clip. Avoid spam tags like Viral,
   FYP, Trending and ExplorePage; those do not make a clip viral.
-- highlight_words: 3 to 6 single words spoken in the clip that carry the punch.
-- edit_beats: zero, one or two timestamps in seconds, inside the clip's start/end, at actual spoken
-  punchlines or reactions worth emphasizing with a brief punch-in and quiet whoosh. Choose moments
-  at least 3 seconds apart. Return [] if there is no clear beat. Do not invent a beat.
+- highlight_words: 3 to 6 key spoken words (or 2-word punch phrases) from the clip that carry the turning point or punchline.
+- edit_beats: 1 to 4 timestamps in seconds (using the same [seconds] scale as start/end) at the real turning
+  points of the clip: the setup shift, the payoff/punchline, and the reaction. Space them at least 2.5 seconds
+  apart inside start/end. Return [] only if the clip is completely flat with no clear beat. Never invent a beat.
 - Write hook, title, description, hashtags and highlight_words in English. If the video is in Hindi or Urdu,
   you may write them the way people type Hindi and Urdu in Roman letters (Hinglish: "yaar ye kya hai"), never
   in Devanagari or Urdu script. For any other language, write them in English.
@@ -172,13 +172,26 @@ def _tidy(c, s, e, game=None):
     cat = cat if cat in CATEGORIES else "other"
     words = c.get("highlight_words") if isinstance(c.get("highlight_words"), list) else []
     raw_beats = c.get("edit_beats") if isinstance(c.get("edit_beats"), list) else []
+    span = max(0.0, e - s)
     beats = []
-    for raw in raw_beats[:8]:
-        beat = _num(raw, -1)
-        if s + 0.5 <= beat <= e - 0.5 and all(abs(beat - prev) >= 3 for prev in beats):
+    for raw in raw_beats[:10]:
+        val = raw.get("at") if isinstance(raw, dict) else raw
+        beat = _num(val, -1)
+        if beat < 0 or span <= 1.0:
+            continue
+        # Accept either absolute transcript timestamps [s, e] or clip-relative offsets [0, e - s] (only when outside [s, e]).
+        if s <= beat <= e:
+            if not (s + 0.4 <= beat <= e - 0.4):
+                continue
+        elif s >= 1.0 and 0.4 <= beat <= span - 0.4:
+            beat = s + beat
+        else:
+            continue
+        if all(abs(beat - prev) >= 2.2 for prev in beats):
             beats.append(round(beat, 2))
-        if len(beats) == 2:
+        if len(beats) == 5:
             break
+    beats.sort()
     title = roman.to_roman(_text(c.get("title"), 100))
     hook = roman.to_roman(_text(c.get("hook"), 60)).upper()
     # Posting adds the tags separately; don't double them up in the social caption.
@@ -298,7 +311,7 @@ def _snap(clip, lines, words, min_len, max_len, duration):
 
 
 def fallback_by_loudness(db, words, n, max_len, duration):
-    """No AI available: take the loudest stretches that contain speech."""
+    """No AI available: take the loudest stretches that contain speech, with loudness-derived beats."""
     z = loud_zscore(db)
     picks, order = [], np.argsort(-z)
     for sec in order:
@@ -306,11 +319,32 @@ def fallback_by_loudness(db, words, n, max_len, duration):
         e = min(duration, s + max_len)
         if any(not (e <= p["start"] or s >= p["end"]) for p in picks):
             continue
-        if not any(s <= w["s"] <= e for w in words):
+        seg_words = [w for w in words if s <= w["s"] <= e]
+        if not seg_words:
             continue
-        picks.append({"start": s, "end": e, "score": 50, "category": "other", "hook": "WAIT FOR IT",
-                      "title": "Loud moment", "description": "", "hashtags": [], "highlight_words": [],
-                      "reason": "Picked by loudness because the AI was unavailable."})
+        # Extract up to 3 genuine loudness peaks inside [s + 0.8, e - 0.8] as non-AI edit beats.
+        lo_i, hi_i = max(0, int(s + 0.8)), min(len(z), int(e - 0.8) + 1)
+        beats = []
+        if hi_i > lo_i:
+            sub = z[lo_i:hi_i]
+            for idx in np.argsort(-sub):
+                if float(sub[idx]) < 1.1:
+                    break
+                t_beat = round(float(lo_i + idx) + 0.2, 2)
+                if s + 0.8 <= t_beat <= e - 0.8 and all(abs(t_beat - prev) >= 3.0 for prev in beats):
+                    beats.append(t_beat)
+                if len(beats) == 3:
+                    break
+            beats.sort()
+        # Truthful short hook & title drawn from the clip's own peak spoken words (never fake clickbait).
+        peak_t = beats[0] if beats else float(sec)
+        near = [w["w"] for w in seg_words if abs(w["s"] - peak_t) <= 2.5][:4] or [w["w"] for w in seg_words[:4]]
+        hook = _text(" ".join(near), 36).upper()
+        picks.append({"start": s, "end": e, "score": 50, "category": "other", "hook": hook,
+                      "title": _text(" ".join(near), 65) or "Highlight moment", "description": "",
+                      "hashtags": [], "highlight_words": [w for w in near if len(w) > 3][:4],
+                      "edit_beats": beats,
+                      "reason": "Picked by loudness peaks because the AI was unavailable."})
         if len(picks) >= n:
             break
     return picks
@@ -396,16 +430,22 @@ def find_live_clips(words, z, now, chat=None, title="", uploader="", min_len=15,
     return clips, spent
 
 
-def describe(text, title="", uploader="", game=None, timeout=None):
+def describe(text, title="", uploader="", game=None, timeout=None, duration=0.0):
     """Hook, title and post text for a clip the user cut by hand."""
     blank = {"score": 0, "category": "other", "hook": "", "title": "", "description": "", "hashtags": [],
-             "highlight_words": [], "reason": "Clipped by hand."}
+             "highlight_words": [], "edit_beats": [], "reason": "Clipped by hand."}
     if len(text.split()) < 4:
         return blank
+    dur = float(duration or 0.0)
+    if dur <= 0.0:
+        marks = [float(m) for m in re.findall(r"\[(\d+(?:\.\d+)?)\]", text)]
+        if marks:
+            dur = max(marks) + 2.0
     prompt = (f"A streamer's viewer clipped this moment by hand.\nVideo title: {_safe(title) or 'unknown'}\n"
-              f"Channel: {_safe(uploader) or 'unknown'}\n\nReturn exactly one item describing it. Set start and end to 0."
+              f"Channel: {_safe(uploader) or 'unknown'}\n\nReturn exactly one item describing it. Set start to 0 "
+              f"and end to {dur:.1f}."
               + _game_rules(game)
-              + RULES.format(min_len=0, max_len=0, transcript=_safe(text, 8000)))
+              + RULES.format(min_len=0, max_len=int(round(dur)) if dur > 0 else 0, transcript=_safe(text, 8000)))
     try:
         out, _m, _u = ask_ai(prompt, purpose="Hand clip: title and hook", timeout=timeout)
         if not out:
@@ -415,7 +455,7 @@ def describe(text, title="", uploader="", game=None, timeout=None):
                                  purpose="Hand clip: title and hook", timeout=timeout)
         if not out:
             return blank
-        c = _tidy(out[0], 0, 0, game)
+        c = _tidy(out[0], 0.0, dur, game)
         c["reason"] = "Clipped by hand."
         return c
     except Exception:  # noqa: BLE001

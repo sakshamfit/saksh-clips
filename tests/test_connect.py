@@ -276,6 +276,26 @@ with ctx.as_user(user.id):
     made = next(c for c in calls if c[1].endswith("/17841/media"))
     check("Instagram: a Reel from the signed link", (made[2]["media_type"], made[2]["video_url"].startswith(BASE + "/pub/")), ("REELS", True))
     check("Instagram: published, with its link", (rid, url), ("media1", "https://www.instagram.com/reel/abc/"))
+    check("Instagram: no user_tags sent when none given", "user_tags" in made[2], False)
+
+    # ---- Instagram username tagging (direct Reel user_tags + Buffer Instagram @mentions + validation + API route)
+    check("Instagram tags: clean strips @, splits and dedupes",
+          accounts.parse_instagram_tags("@Creator_One, creator_one  @friend.2", strict=True),
+          ["Creator_One", "friend.2"])
+    bad_tag_err = False
+    try:
+        accounts.parse_instagram_tags("@good, bad!name", strict=True)
+    except ValueError:
+        bad_tag_err = True
+    check("Instagram tags: invalid username rejected in strict mode", bad_tag_err, True)
+
+    calls.clear()
+    rid, url = accounts.instagram_upload(ig, jd / "clip01.mp4", "My caption", "job-12345678",
+                                         user_tags=["@Creator_One", "friend.2"])
+    made_tagged = next(c for c in calls if c[1].endswith("/17841/media"))
+    check("Instagram: user_tags JSON sent on Reel container",
+          json.loads(made_tagged[2]["user_tags"]),
+          [{"username": "Creator_One", "x": 0.5, "y": 0.5}, {"username": "friend.2", "x": 0.5, "y": 0.5}])
 
     uploads.clear(); tt.update(audited=False, status=0)
     rid, url = accounts.tiktok_upload(ttacc, jd / "clip01.mp4", "My caption #fyp", "public")
@@ -357,6 +377,33 @@ with ctx.as_user(user.id):
     with ctx.as_user(user.id):
         made2 = posting.enqueue(job, clip, accs_buf[:1], now=True)
     check("Queue: the same clip never goes to the same account twice", len(made2), 0)
+    posting._posts[:] = []
+    # Posting to Instagram (direct + Buffer Instagram) via /api/posts carries instagram_tags into posting
+    clip.pop("posts", None)
+    clip.pop("instagram_tags", None)
+    r_bad = b.post("/api/posts", json={"job": job["id"], "clip": clip["id"],
+                                       "accounts": [accs["instagram"]["id"]], "now": True,
+                                       "instagram_tags": "@valid_user, bad!handle"}, headers={"Origin": BASE})
+    check("API /api/posts: rejects invalid Instagram username with 400", r_bad.status_code, 400)
+    r_ok = b.post("/api/posts", json={"job": job["id"], "clip": clip["id"],
+                                      "accounts": [accs["instagram"]["id"], "bf_ch_ig"], "now": True,
+                                      "instagram_tags": "@streamer_one, @cohost"}, headers={"Origin": BASE})
+    check("API /api/posts: queues with cleaned instagram_tags",
+          (r_ok.status_code, r_ok.json().get("instagram_tags")), (200, ["streamer_one", "cohost"]))
+    ig_queued = [p for p in posting._posts if p["job"] == job["id"] and p["clip"] == clip["id"]]
+    check("Queue: instagram_tags saved on direct IG and Buffer IG posts",
+          [p.get("instagram_tags") for p in ig_queued],
+          [["streamer_one", "cohost"], ["streamer_one", "cohost"]])
+    calls.clear(); buf["posts"].clear(); buf["state"] = {"status": "sending"}
+    with ctx.as_user(user.id):
+        for p in ig_queued:
+            posting._post(p)
+    ig_media_call = next(c for c in calls if c[1].endswith("/17841/media"))
+    check("Posting worker: passes user_tags to Instagram Reel upload",
+          json.loads(ig_media_call[2]["user_tags"]),
+          [{"username": "streamer_one", "x": 0.5, "y": 0.5}, {"username": "cohost", "x": 0.5, "y": 0.5}])
+    check("Posting worker: appends @mentions for Buffer Instagram channel",
+          "@streamer_one @cohost" in buf["posts"][-1]["text"], True)
     posting._posts[:] = []
     buf["state"] = None
     jobs_mod._jobs.pop(job["id"], None)

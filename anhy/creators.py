@@ -14,7 +14,9 @@ def _root() -> Path:
 
 _lock = threading.RLock()
 
-DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "captions": True, "min_len": 15, "max_len": 60,
+DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "captions": True,
+            "edit_style": "pro", "auto_edit": True, "sound_fx": True,
+            "min_len": 15, "max_len": 60,
             "max_clips": 6, "min_score": 80, "auto_watch": False, "buffer_min": 20, "live_per_hour": 4, "ai_every_min": 3, "ai_only_on_spike": True, "auto_jump_pct": 60,
             "plan": "free", "decide_mode": "both", "must_clip_min": 0, "min_gap_min": 2,
             "game": "",
@@ -40,6 +42,12 @@ def _fix(c: dict) -> dict:
         c["ai_every_min"] = 3       # "Auto" (0) is gone: jumps in loudness and chat are now always checked
     if c.get("channel") not in ch.values():
         c["channel"] = next((ch[k] for k in PLATFORMS if k in ch), "")
+    es = str(c.get("edit_style") or "").strip().lower()
+    if es not in ("off", "balanced", "pro", "energetic"):
+        es = "pro" if c.get("auto_edit", True) else "off"
+    c["edit_style"] = es
+    c["auto_edit"] = (es != "off")
+    c["sound_fx"] = bool(c.get("sound_fx", True))
     return c
 NUMERIC = {"min_len": (5, 120), "max_len": (10, 180), "max_clips": (1, 20), "min_score": (0, 100), "buffer_min": (5, 120), "live_per_hour": (1, 60), "ai_every_min": (1, 30), "auto_jump_pct": (20, 300), "must_clip_min": (0, 240), "min_gap_min": (0, 60),
            "post_min_score": (0, 100), "post_gap_min": (5, 1440), "daily_cap": (1, 50)}
@@ -54,11 +62,18 @@ def root(cid) -> Path:
 def _clean(data: dict) -> dict:
     out = {}
     for k in DEFAULTS:
-        if k == "captions":
+        if k in ("captions", "auto_edit", "sound_fx"):
             if k in data:
                 if not isinstance(data[k], bool):
-                    raise ValueError("Captions must be on or off.")
+                    raise ValueError(f"{k.replace('_', ' ').title()} must be on or off.")
                 out[k] = data[k]
+            continue
+        if k == "edit_style":
+            if k in data and data[k] is not None:
+                v = str(data[k]).strip().lower()
+                if v not in ("off", "balanced", "pro", "energetic"):
+                    raise ValueError("Edit style must be off, balanced, pro, or energetic.")
+                out[k] = v
             continue
         if k not in data or data[k] is None:
             continue
@@ -83,6 +98,10 @@ def _clean(data: dict) -> dict:
         else:
             v = str(v).strip()[:300]
         out[k] = v
+    if "edit_style" in out:
+        out["auto_edit"] = (out["edit_style"] != "off")
+    elif "auto_edit" in out:
+        out["edit_style"] = "pro" if out["auto_edit"] else "off"
     return out
 
 
