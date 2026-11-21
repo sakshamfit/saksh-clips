@@ -477,6 +477,63 @@ def clean_instagram_tags(raw) -> list:
     return parse_instagram_tags(raw, strict=False)
 
 
+def _ig_username_from_name(name) -> str:
+    m = re.match(r"@?([A-Za-z0-9._]{1,30})", str(name or "").strip())
+    return m.group(1) if m else ""
+
+
+def suggest_instagram_tags(q: str = "", limit: int = 8) -> list:
+    """Live suggestions for the Instagram tag box, as the person types a name.
+
+    Instagram has no search API for usernames, so the suggestions come from IDs this person already knows:
+    their connected Instagram accounts, usernames they have tagged before, and their creators' channel
+    handles. Each row is {"username", "label", "source"}; names starting with what was typed come first.
+    """
+    needle = re.sub(r"[^a-z0-9._]", "", str(q or "").lower().lstrip("@"))[:30]
+    found: dict = {}
+
+    def add(username, label, source, rank):
+        u = str(username or "").strip().lstrip("@")
+        if not _IG_USER_RE.fullmatch(u) or u.startswith(".") or u.endswith(".") or ".." in u:
+            return
+        key = u.lower()
+        if key not in found:
+            found[key] = {"username": u, "label": label or "@" + u, "source": source, "_rank": rank}
+
+    for a in list_accounts():
+        if a["platform"] == "instagram" or (a["platform"] == "buffer" and a.get("service") == "instagram"):
+            add(_ig_username_from_name(a["name"]), a["name"], "Connected account", 0)
+
+    try:
+        from . import creators, jobs, posting
+        for j in jobs.list_jobs():
+            for c in j.get("clips") or []:
+                for u in c.get("instagram_tags") or []:
+                    add(u, "@" + str(u).lstrip("@"), "Tagged before", 1)
+                for p in (c.get("posts") or {}).values():
+                    for u in p.get("instagram_tags") or []:
+                        add(u, "@" + str(u).lstrip("@"), "Tagged before", 1)
+        for p in posting._mine():
+            for u in p.get("instagram_tags") or []:
+                add(u, "@" + str(u).lstrip("@"), "Tagged before", 1)
+        for c in creators.all_creators():
+            for plat, url in (c.get("channels") or {}).items():
+                seg = str(url or "").rstrip("/").split("/")[-1].split("?")[0]
+                add(seg, "@" + seg, f"{plat.title()} channel", 2)
+    except Exception:  # noqa: BLE001 - suggestions must never stop the page
+        pass
+
+    def score(item):
+        u = item["username"].lower()
+        match = 0 if u.startswith(needle) else 1 if needle in u else 2
+        return (match, item["_rank"], u)
+
+    rows = [v for v in found.values() if not needle or needle in v["username"].lower()]
+    rows.sort(key=score)
+    return [{"username": v["username"], "label": v["label"], "source": v["source"]}
+            for v in rows[: max(1, min(limit, 20))]]
+
+
 def _append_ig_mentions(text: str, tags: list) -> str:
     """Append @mentions for usernames not already mentioned in the caption (used by Buffer Instagram posts)."""
     clean = clean_instagram_tags(tags)

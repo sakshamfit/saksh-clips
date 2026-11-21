@@ -1642,6 +1642,13 @@ def apps_put(request: Request, body: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
+@app.get("/api/instagram-tags/suggest")
+def instagram_tag_suggest(q: str = ""):
+    """Live username suggestions for the Instagram tag box, as the person types a name."""
+    _throttle("igtagsuggest:" + ctx.uid(), 120, 60, "Too many lookups at once. Wait a moment.")
+    return {"suggestions": accounts.suggest_instagram_tags(q)}
+
+
 @app.post("/api/posts")
 def add_posts(body: dict = Body(...)):
     job = jobs.get(str(body.get("job")))

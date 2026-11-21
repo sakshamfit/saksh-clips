@@ -1128,6 +1128,14 @@ a.lnk:hover{opacity:.75}
 .ig-tag-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ig-tag-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line-2);color:var(--text)}
 .ig-tag-err{font-size:12px;color:var(--bad);margin:0}
+.ig-tag-wrap{position:relative}
+.ig-tag-wrap>input{width:100%}
+.ig-suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--bg);border:1px solid var(--line-2);border-radius:10px;max-height:220px;overflow:auto;padding:4px}
+.ig-suggest-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:7px;background:none;border:0;color:var(--text);cursor:pointer;font-size:13px}
+.ig-suggest-item:hover,.ig-suggest-item.on{background:var(--muted)}
+.ig-suggest-item .u{font-weight:600}
+.ig-suggest-item .s{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap}
+.ig-suggest-empty{padding:8px 9px;font-size:12px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -3185,6 +3193,7 @@ function drawClipDlg(full) {
     if (sb) sb.innerHTML = editSummaryHtml(c, false);
   }
   D.sig = sig;
+  attachIgTagSuggest($("#dlg_ig_tags"));
   put($("#dposts"), postPills(c));
 }
 $("#clipdlg").addEventListener("close", () => { $("#clipdlg").innerHTML = ""; D.jid = null; });
@@ -3576,6 +3585,136 @@ function parseIgTagsClient(raw) {
   }
   return {tags, bad};
 }
+/* Live @ suggestions for the Instagram tag boxes: as the person types a name, matching IDs appear
+   underneath — from their connected Instagram accounts, IDs tagged before, and their creators' channels.
+   The server list (/api/instagram-tags/suggest) is asked on every pause in typing; the same IDs already
+   on the page are filtered instantly so the list never waits for the network. */
+function igTagToken(inp) {
+  const pos = inp.selectionStart ?? inp.value.length;
+  const before = inp.value.slice(0, pos);
+  let start = Math.max(before.lastIndexOf(","), before.lastIndexOf(";"), before.lastIndexOf(" "),
+                       before.lastIndexOf("\n"), before.lastIndexOf("\t")) + 1;
+  while (start < pos && before[start] === " ") start++;
+  return {token: before.slice(start, pos), start, end: pos};
+}
+function igTagLocalCandidates() {
+  const seen = new Map();
+  const add = (u, label, source) => {
+    u = String(u || "").replace(/^@+/, "").trim();
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(u) || u.startsWith(".") || u.endsWith(".") || u.includes("..")) return;
+    const k = u.toLowerCase();
+    if (!seen.has(k)) seen.set(k, {username: u, label: label || "@" + u, source});
+  };
+  (S.accounts || []).filter(isInstagramAcc).forEach(a => {
+    const m = String(a.name || "").match(/^@?([A-Za-z0-9._]{1,30})/);
+    if (m) add(m[1], a.name, "Connected account");
+  });
+  (S.jobs || []).forEach(j => (j.clips || []).forEach(c => {
+    (c.instagram_tags || []).forEach(u => add(u, "@" + u, "Tagged before"));
+    Object.values(c.posts || {}).forEach(p => (p.instagram_tags || []).forEach(u => add(u, "@" + u, "Tagged before")));
+  }));
+  (S.creators || []).forEach(c => Object.entries(c.channels || {}).forEach(([k, url]) => {
+    const seg = String(url || "").replace(/\/+$/, "").split("/").pop();
+    if (seg) add(seg, "@" + seg, (PLAT[k]?.name || k) + " channel");
+  }));
+  return [...seen.values()];
+}
+function igTagFilterLocal(q, exclude) {
+  const needle = q.replace(/^@+/, "").toLowerCase();
+  return igTagLocalCandidates()
+    .filter(c => !exclude.has(c.username.toLowerCase()) && (!needle || c.username.toLowerCase().includes(needle)))
+    .sort((a, b) => {
+      const pa = a.username.toLowerCase().startsWith(needle) ? 0 : 1, pb = b.username.toLowerCase().startsWith(needle) ? 0 : 1;
+      return pa - pb || a.username.localeCompare(b.username);
+    }).slice(0, 8);
+}
+function attachIgTagSuggest(inp) {
+  if (!inp || inp.dataset.igSuggest) return;
+  inp.dataset.igSuggest = "1";
+  inp.setAttribute("role", "combobox");
+  inp.setAttribute("aria-expanded", "false");
+  const wrap = document.createElement("div");
+  wrap.className = "ig-tag-wrap";
+  inp.replaceWith(wrap);
+  wrap.append(inp);
+  const box = document.createElement("div");
+  box.className = "ig-suggest";
+  box.hidden = true;
+  box.setAttribute("role", "listbox");
+  wrap.append(box);
+  let items = [], hi = -1, seq = 0, timer = null;
+  const excludeSet = () => {
+    const cur = igTagToken(inp).token.replace(/^@+/, "").toLowerCase();
+    return new Set(parseIgTagsClient(inp.value).tags.map(t => t.toLowerCase()).filter(k => k !== cur));
+  };
+  const paint = () => box.querySelectorAll(".ig-suggest-item").forEach((el, i) => {
+    el.classList.toggle("on", i === hi);
+    el.setAttribute("aria-selected", String(i === hi));
+  });
+  const render = list => {
+    items = list; hi = list.length ? 0 : -1;
+    inp.setAttribute("aria-expanded", "true");
+    if (!list.length) {
+      box.innerHTML = `<div class="ig-suggest-empty">No saved ID matches — keep typing, you can still add it by hand.</div>`;
+      box.hidden = false;
+      return;
+    }
+    box.innerHTML = list.map((c, i) =>
+      `<button type="button" class="ig-suggest-item${i === hi ? " on" : ""}" role="option" aria-selected="${i === hi}" data-i="${i}"><span class="u">@${esc(c.username)}</span><span class="s">${esc(c.source || "")}</span></button>`).join("");
+    box.hidden = false;
+  };
+  const hide = () => { box.hidden = true; items = []; hi = -1; inp.setAttribute("aria-expanded", "false"); };
+  const pick = c => {
+    if (!c) return;
+    const {start, end} = igTagToken(inp);
+    const insert = "@" + c.username + ", ";
+    inp.value = inp.value.slice(0, start) + insert + inp.value.slice(end);
+    const pos = start + insert.length;
+    inp.focus();
+    inp.setSelectionRange(pos, pos);
+    hide();
+    inp.dispatchEvent(new Event("input", {bubbles: true}));
+  };
+  const update = () => {
+    const {token} = igTagToken(inp);
+    const q = token.replace(/^@+/, "");
+    if (!token || !/^[A-Za-z0-9._]*$/.test(q)) { hide(); return; }
+    render(igTagFilterLocal(q, excludeSet()));   // instant, from IDs already on the page
+    const my = ++seq;
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const d = await api("/api/instagram-tags/suggest?q=" + encodeURIComponent(q));
+        if (my !== seq || !document.contains(inp)) return;
+        const ex = excludeSet();
+        const remote = (d.suggestions || []).filter(c => !ex.has(String(c.username).toLowerCase())).slice(0, 8);
+        if (remote.length) render(remote);        // the server list wins when it has matches
+      } catch {}
+    }, 160);
+  };
+  inp.addEventListener("input", update);
+  inp.addEventListener("click", update);
+  inp.addEventListener("keydown", e => {
+    if (box.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!items.length) return;
+      e.preventDefault();
+      hi = (hi + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      paint();
+    } else if ((e.key === "Enter" || e.key === "Tab") && items.length && hi >= 0) {
+      e.preventDefault();
+      pick(items[hi]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      hide();
+    }
+  });
+  box.addEventListener("mousedown", e => {
+    const b = e.target.closest(".ig-suggest-item");
+    if (b) { e.preventDefault(); pick(items[+b.dataset.i]); }
+  });
+  inp.addEventListener("blur", () => setTimeout(hide, 150));
+}
 function askInstagramTags({igAccs, totalCount, isNow, initial}) {
   return new Promise(res => {
     const d = $("#formdlg");
@@ -3596,7 +3735,7 @@ function askInstagramTags({igAccs, totalCount, isNow, initial}) {
       </label>
       <div class="ig-tag-chips" id="ig_tag_chips"></div>
       <p class="ig-tag-err" id="ig_tag_err" hidden></p>
-      <p class="sub" style="font-size:12px">${esc(note)}</p>
+      <p class="sub" style="font-size:12px">Start typing a name and matching IDs appear underneath — from your connected accounts and IDs you have tagged before. ${esc(note)}</p>
       <div class="dlg-foot">
         <button class="btn" value="no" formnovalidate>Cancel</button>
         <button class="btn primary" value="yes" id="ig_tag_ok">${ic("send")}${esc(okLabel)}</button>
@@ -3616,6 +3755,7 @@ function askInstagramTags({igAccs, totalCount, isNow, initial}) {
       }
     };
     inp.addEventListener("input", refresh);
+    attachIgTagSuggest(inp);
     refresh();
     d.onclose = () => {
       if (d.returnValue !== "yes") return res(null);
