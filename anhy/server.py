@@ -10,6 +10,7 @@ import re
 import shutil
 import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
@@ -34,29 +35,11 @@ def _quiet(fn):
         print(f"  {e}", flush=True)
 
 
-app = FastAPI(title="Anhy Clips", docs_url=None, redoc_url=None, openapi_url=None)
-WEB = config.ROOT / "web"
-OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
-PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
-         "/privacy": "legal.html", "/terms": "legal.html", "/acceptable-use": "legal.html"}
-VIDEO_TYPES = media.VIDEO_EXTS
-CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; "
-       "frame-src https://player.twitch.tv https://www.youtube-nocookie.com https://player.kick.com; "
-       "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com")
-
-
-BOOT = f"{int(time.time()) % 100000:x}"     # part of every sync token, so pages reload their data after a restart
-
-
-@app.on_event("startup")
-async def _more_threads():
+@asynccontextmanager
+async def lifespan(_app):
+    # Startup: replace the deprecated @app.on_event("startup") handlers.
     import anyio.to_thread
     anyio.to_thread.current_default_thread_limiter().total_tokens = int(config.env("ANHY_REQUEST_THREADS", "64"))
-
-
-@app.on_event("startup")
-def _startup():
     db.init()
     for f in (config.TMP_DIR / "uploads").glob("*"):      # uploads cut short by a restart
         try:
@@ -75,6 +58,24 @@ def _startup():
     posting.start()
     from . import updates
     updates.start()                  # looks for a newer Anhy Clips every minute, in the background
+    yield
+    # Shutdown: nothing to tear down yet. Sessions, jobs and live recordings live in this process.
+
+
+app = FastAPI(title="Anhy Clips", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+WEB = config.ROOT / "web"
+OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
+PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
+         "/privacy": "legal.html", "/terms": "legal.html", "/acceptable-use": "legal.html"}
+VIDEO_TYPES = media.VIDEO_EXTS
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+       "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; "
+       "frame-src https://player.twitch.tv https://www.youtube-nocookie.com https://player.kick.com; "
+       "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com")
+
+
+BOOT = f"{int(time.time()) % 100000:x}"     # part of every sync token, so pages reload their data after a restart
+
 
 
 # ================================================================ the gate: who is asking, and are they allowed
@@ -606,6 +607,9 @@ def _job_slots():
 _create_lock = threading.Lock()      # "do I have a free slot?" and "take it" happen together, so bursts cannot slip past the limit
 _lookups = threading.BoundedSemaphore(8)   # link and channel previews running at once, whole server
 _disk: dict = {}
+# Never let the per-user quota cache grow without bound: one entry per user who
+# ever uploads would leak memory forever. Cap it and evict the oldest entry.
+_DISK_MAX = 1024
 
 
 def _quota():
@@ -623,6 +627,9 @@ def _quota():
                     total += os.path.getsize(os.path.join(root, f))
                 except OSError:
                     pass
+        if len(_disk) >= _DISK_MAX:
+            oldest = min(_disk.items(), key=lambda kv: kv[1][0])[0]
+            _disk.pop(oldest, None)
         got = _disk[uid] = (time.time(), total)
     if got[1] > config.MAX_USER_GB * 1e9:
         raise HTTPException(507, "Your storage is full. Delete some older videos to make room.")
