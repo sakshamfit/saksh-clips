@@ -157,6 +157,23 @@ check("AI can leave a title as an honest caption fallback", brain._tidy({"title"
 check("a clip still gets clean tags when AI is unavailable", len(brain._tidy({"hashtags": []}, 0, 10)["hashtags"]) == 3)
 check("manually cleared tags stay cleared", brain.clean_hashtags("", fill=False) == [])
 
+# ---- every way the AI can fail must leave a reason the dashboard can show
+ai.problem.update(text="", at=0.0)
+real_ready = config.ai_ready
+config.ai_ready = lambda: False
+try:
+    brain.ask_ai("x", purpose="test")
+except Exception:  # noqa: BLE001
+    pass
+config.ai_ready = real_ready
+check("an AI that is not set up yet is said on the dashboard", bool(ai.problem["text"]))
+check("...in words that say what to do about it", "Settings, AI" in ai.problem["text"])
+
+check("a refused key is explained in words", "refused the key" in ai.explain(ai.AIError("HTTP 401 invalid api key")))
+check("a broken service is explained in words", "problem on its side" in ai.explain(ai.AIError("HTTP 500 internal server error")))
+check("an answer with no JSON in it is explained", "not in the form" in ai.explain(RuntimeError("The AI did not answer with JSON.")))
+check("an error nobody has words for is still shown", bool(ai.explain(RuntimeError("something odd")) or "did not answer"))
+
 print("ALL PASSED" if not fails else f"{len(fails)} failed")
 import shutil  # noqa: E402
 db.engine.dispose()

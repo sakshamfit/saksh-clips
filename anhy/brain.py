@@ -252,7 +252,9 @@ def ask_ai(prompt, schema=None, purpose="AI call", timeout=None):
     """Try each model in order, with a couple of retries for rate limits and overloads.
     Returns (the answer, the model that gave it, tokens used) and notes the tokens in the usage record."""
     if not config.ai_ready():
-        raise RuntimeError("The AI is not set up on this server.")
+        e = RuntimeError("The AI is not set up on this server.")
+        ai.note_problem(e)          # say so on the dashboard: otherwise the AI just silently does nothing
+        raise e
     last = None
     for model in ai.models():
         for attempt in range(3):
