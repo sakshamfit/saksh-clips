@@ -1562,7 +1562,9 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
                     edit_style=plan["style"])
 
     # Short temp folder keeps ffmpeg's libass filter path safe on Windows & avoids colon escaping issues.
-    work = Path(tempfile.mkdtemp(prefix="pk"))
+    # Render inside the data/tmp folder (a controlled short path) instead of the system temp dir, so a deep
+    # Windows temp path never exceeds the 260-character limit and breaks libass filter paths.
+    work = Path(tempfile.mkdtemp(prefix="pk", dir=config.TMP_DIR))
     try:
         result = _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face,
                             beats=beats, sound_fx=plan["sound_active"], plan=plan)
