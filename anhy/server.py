@@ -606,6 +606,9 @@ def _job_slots():
 _create_lock = threading.Lock()      # "do I have a free slot?" and "take it" happen together, so bursts cannot slip past the limit
 _lookups = threading.BoundedSemaphore(8)   # link and channel previews running at once, whole server
 _disk: dict = {}
+# Never let the per-user quota cache grow without bound: one entry per user who
+# ever uploads would leak memory forever. Cap it and evict the oldest entry.
+_DISK_MAX = 1024
 
 
 def _quota():
@@ -623,6 +626,9 @@ def _quota():
                     total += os.path.getsize(os.path.join(root, f))
                 except OSError:
                     pass
+        if len(_disk) >= _DISK_MAX:
+            oldest = min(_disk.items(), key=lambda kv: kv[1][0])[0]
+            _disk.pop(oldest, None)
         got = _disk[uid] = (time.time(), total)
     if got[1] > config.MAX_USER_GB * 1e9:
         raise HTTPException(507, "Your storage is full. Delete some older videos to make room.")
