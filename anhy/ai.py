@@ -191,6 +191,8 @@ def explain(e) -> str:
     """What went wrong with an AI call, in words the owner can act on."""
     text, low = str(e), str(e).lower()
     name = (models() or ["?"])[0]
+    if "not set up" in low:
+        return "The AI is not set up yet. Open Settings, AI, choose a service, paste a key and press Save and test."
     if "404" in text or "not found" in low or "does not exist" in low or "unknown model" in low or "not_found" in low:
         return f"{label()} doesn't know the model \"{name}\". Open Settings, AI, press Find models and pick one from the list."
     if "401" in text or "403" in text or "api key" in low or "api_key" in low or "unauthorized" in low or "permission" in low:
@@ -199,14 +201,18 @@ def explain(e) -> str:
         return f"{label()} says the key has hit its limit or has no credit left. Check the account with {label()}, or try again later."
     if "connect" in low or "timed out" in low or "timeout" in low or "getaddrinfo" in low or "refused" in low or "nodename" in low or "servname" in low or "nameresolutionerror" in low or "name resolution" in low:
         return f"Anhy Clips couldn't reach {label()}. Check the internet connection" + (" and that Ollama is running." if provider() == "ollama" else ".")
+    if "did not answer with json" in low:
+        return f"{label()} answered, but not in the form Anhy Clips asked for. Try another model under Settings, AI."
+    if "http 5" in low or "internal server error" in low or "bad gateway" in low or "service unavailable" in low:
+        return f"{label()} had a problem on its side just now. That usually clears by itself; try again in a minute."
     return ""
 
 
 def note_problem(e):
+    """Remember why the AI last failed, so the dashboard can say so. Every failure is remembered: an error
+    nobody has words for still has to be shown, or the owner sees an AI that silently does nothing."""
     import time
-    why = explain(e)
-    if why:
-        problem.update(text=why, at=time.time())
+    problem.update(text=explain(e) or f"{label()} did not answer: {str(e)[:180]}", at=time.time())
 
 
 def clear_problem():
