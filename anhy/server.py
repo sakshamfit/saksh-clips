@@ -10,6 +10,7 @@ import re
 import shutil
 import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
@@ -34,29 +35,11 @@ def _quiet(fn):
         print(f"  {e}", flush=True)
 
 
-app = FastAPI(title="Anhy Clips", docs_url=None, redoc_url=None, openapi_url=None)
-WEB = config.ROOT / "web"
-OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
-PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
-         "/privacy": "legal.html", "/terms": "legal.html", "/acceptable-use": "legal.html"}
-VIDEO_TYPES = media.VIDEO_EXTS
-CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; "
-       "frame-src https://player.twitch.tv https://www.youtube-nocookie.com https://player.kick.com; "
-       "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com")
-
-
-BOOT = f"{int(time.time()) % 100000:x}"     # part of every sync token, so pages reload their data after a restart
-
-
-@app.on_event("startup")
-async def _more_threads():
+@asynccontextmanager
+async def lifespan(_app):
+    # Startup: replace the deprecated @app.on_event("startup") handlers.
     import anyio.to_thread
     anyio.to_thread.current_default_thread_limiter().total_tokens = int(config.env("ANHY_REQUEST_THREADS", "64"))
-
-
-@app.on_event("startup")
-def _startup():
     db.init()
     for f in (config.TMP_DIR / "uploads").glob("*"):      # uploads cut short by a restart
         try:
@@ -75,6 +58,24 @@ def _startup():
     posting.start()
     from . import updates
     updates.start()                  # looks for a newer Anhy Clips every minute, in the background
+    yield
+    # Shutdown: nothing to tear down yet. Sessions, jobs and live recordings live in this process.
+
+
+app = FastAPI(title="Anhy Clips", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+WEB = config.ROOT / "web"
+OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
+PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
+         "/privacy": "legal.html", "/terms": "legal.html", "/acceptable-use": "legal.html"}
+VIDEO_TYPES = media.VIDEO_EXTS
+CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+       "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; "
+       "frame-src https://player.twitch.tv https://www.youtube-nocookie.com https://player.kick.com; "
+       "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com")
+
+
+BOOT = f"{int(time.time()) % 100000:x}"     # part of every sync token, so pages reload their data after a restart
+
 
 
 # ================================================================ the gate: who is asking, and are they allowed
