@@ -428,6 +428,8 @@ img.av{object-fit:cover}
 .lay-prev .ph i{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:16px;background:linear-gradient(135deg,#FF8B33,#FFB27A)}
 .lay-prev.zoom .ph i{left:-6px;right:-6px;height:24px}
 .lay-prev.crop .ph i{left:0;right:0;top:0;height:100%;transform:none}
+.lay-prev.split .ph::before{background:linear-gradient(to bottom,#d79773 0 48%,#302722 48% 52%,#73717c 52% 100%);filter:none;opacity:1}
+.lay-prev.split .ph i{left:0;right:0;top:50%;height:2px;transform:translateY(-50%);background:#FF8B33}
 .seg{display:flex;gap:4px;background:#fff;border-radius:10px;padding:4px}
 .composer.compact .seg{background:var(--muted)}
 .seg button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;border:0;border-radius:7px;background:transparent;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s ease,color .15s ease}
@@ -463,7 +465,7 @@ dialog.pickdlg{border:1px solid var(--line);background:#fff;color:var(--text);bo
 .pd h2{font-size:18px;font-weight:600;color:var(--brand-ink)}
 .pd .pd-sub{font-size:13px;color:var(--dim);margin-top:-8px}
 .pd h3{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
-.pd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pd-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .pd-grid.caps{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pd-opt{display:flex;flex-direction:column;gap:7px;padding:6px 6px 9px;border:0;border-radius:11px;background:var(--muted);color:var(--dim);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:background-color .15s ease,color .15s ease}
 .pd-opt:hover,.pd-opt:focus-visible{background:#EDE3DB;color:var(--text)}
@@ -1860,7 +1862,7 @@ function drawAdd(variant) {
       </div></div>
       <div class="ob wide"><div class="ot cap-head"><span>Framing and captions</span>
         <button type="button" class="lnk" data-act="openpick" style="border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;padding:0">Choose them with a preview &rsaquo;</button></div>
-        <p class="sub" style="margin:0;font-size:12px">Picked before every batch, on the video itself: the framing (blurred fill, zoomed, fill screen, gameplay with the webcam) and the caption style.</p></div>
+        <p class="sub" style="margin:0;font-size:12px">Picked before every batch, on the video itself: the framing (blurred fill, zoomed, fill screen, gameplay with the webcam, or streamer above gameplay) and the caption style.</p></div>
       <div class="ob"><div class="ot">Video quality</div><input type="hidden" id="o_quality" value="720"><div class="seg" role="group" aria-label="Video quality">
         <button type="button" data-seg="o_quality" data-v="720" aria-pressed="true">720p<small>Fast</small></button>
         <button type="button" data-seg="o_quality" data-v="1080" aria-pressed="false">1080p<small>Sharper, about 2x slower</small></button></div></div>
@@ -1870,7 +1872,7 @@ function drawAdd(variant) {
     </div></div></form>`;
   drawAtt();
 }
-const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", gameplay:"Gameplay + facecam"};
+const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", gameplay:"Gameplay + facecam", split:"Streamer + gameplay"};
 const CAP_LOOK = {bounce:{font:"'Archivo Black'", hl:"#FFFF00", up:true}, hype:{font:"Anton", hl:"#FF3C3C", up:true}, clean:{font:"Poppins", hl:"#6BD7FF", up:false, w:800}};
 function picker(id, aria, items, val) {
   const cur = items.find(x => String(x.v) === String(val)) || items[0];
@@ -2178,9 +2180,11 @@ function sendFile(f, who, options) {
 const PICK = {open: false, resolve: null, opts: null, target: null, look: {}};
 const LOOK_STYLES = {bounce: "Bounce", hype: "Hype", clean: "Clean"};
 const LOOK_LAYOUTS = {blur: "Full frame + blurred fill", zoom: "Zoomed in + blurred fill", crop: "Fill screen (centre crop)",
-                      gameplay: "Gameplay fills the screen, facecam in the corner"};
+                      gameplay: "Gameplay fills the screen, facecam in the corner",
+                      split: "Streamer on top, gameplay on bottom (half and half)"};
 const LAYOUT_WHY = {blur: "The whole picture, with a blurred copy filling the rest.", zoom: "The picture larger, the edges blurred away.",
-                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner."};
+                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner.",
+                    split: "The detected streamer fills the top half and gameplay fills the bottom half. If no webcam is found, the clip uses full-screen gameplay."};
 
 /* What the chooser starts on: the creator's own settings, then whatever was chosen for this creator last time
    (kept in this browser), then the number in the Options panel if it was changed there. Only the four things the
@@ -2252,7 +2256,25 @@ function paintLayout(cv, img, layout) {
   const sw = img.width || 16, sh = img.height || 9, vertical = sh >= sw;
   const drawIn = (dw, dh) => g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
   const cover = () => { const s = Math.max(W / sw, H / sh); drawIn(sw * s, sh * s); };
-  if (layout === "crop" || layout === "gameplay") {
+  const panel = (y, h, focusRight = false) => {
+    const cropW = Math.min(sw, sh * W / h), cropH = Math.min(sh, sw * h / W);
+    const sx = focusRight ? sw - cropW : (sw - cropW) / 2, sy = (sh - cropH) / 2;
+    g.save(); g.beginPath(); g.rect(0, y, W, h); g.clip();
+    g.drawImage(img, sx, sy, cropW, cropH, 0, y, W, h); g.restore();
+  };
+  if (layout === "split") {
+    const half = H / 2;
+    panel(0, half, true); panel(half, H - half);
+    g.fillStyle = "#fff"; g.fillRect(0, half - 2, W, 4);
+    const tag = (label, y) => {
+      g.font = `700 ${Math.max(8, Math.round(W * 0.04))}px Arial, sans-serif`;
+      const tw = g.measureText(label).width, x = W * 0.04, th = H * 0.04;
+      g.fillStyle = "rgba(12,10,10,.76)";
+      g.beginPath(); g.roundRect ? g.roundRect(x, y, tw + 12, th, 4) : g.rect(x, y, tw + 12, th); g.fill();
+      g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(label, x + 6, y + th / 2);
+    };
+    tag("STREAMER", H * 0.035); tag("GAMEPLAY", half + H * 0.035);
+  } else if (layout === "crop" || layout === "gameplay") {
     if (layout === "gameplay" && !vertical) {
       cover();
       const pw = W * 0.34, ph = pw * 0.75;         // the webcam in the corner
@@ -2266,7 +2288,7 @@ function paintLayout(cv, img, layout) {
     const fgW = fgH * sw / sh;
     g.drawImage(img, (W - fgW) / 2, (H - fgH) / 2, fgW, fgH);
   }
-  const top = layout === "crop" || layout === "gameplay" ? H * 0.1 : H * 0.055;
+  const top = layout === "split" ? H * 0.56 : (layout === "crop" || layout === "gameplay" ? H * 0.1 : H * 0.055);
   g.fillStyle = "#fff"; g.globalAlpha = 0.93;
   const bw = W * 0.74, bh = H * 0.042, bx = (W - bw) / 2;
   g.beginPath(); g.roundRect ? g.roundRect(bx, top, bw, bh, bh * 0.4) : g.rect(bx, top, bw, bh); g.fill();
@@ -2292,7 +2314,9 @@ function drawLook() {
   g.textAlign = "center"; g.textBaseline = "middle";
   g.font = `800 ${Math.round(W * 0.075)}px 'Poppins', sans-serif`;      // the hook in its white box
   g.fillStyle = "#14100E";
-  g.fillText("this is the part worth watching", W / 2, (o.layout === "crop" || o.layout === "gameplay") ? H * 0.1 + H * 0.042 / 2 : H * 0.055 + H * 0.042 / 2);
+  const hookY = o.layout === "split" ? H * 0.56 + H * 0.042 / 2
+    : (o.layout === "crop" || o.layout === "gameplay") ? H * 0.1 + H * 0.042 / 2 : H * 0.055 + H * 0.042 / 2;
+  g.fillText("this is the part worth watching", W / 2, hookY);
   if (o.captions === false) return;
   const size = Math.round(W * (o.style === "hype" ? 0.2 : o.style === "clean" ? 0.15 : 0.17));
   g.font = `${o.style === "hype" ? "400" : "800"} ${size}px ${o.style === "hype" ? "Anton" : "Poppins"}, sans-serif`;
@@ -2349,7 +2373,7 @@ function drawPick(opts, A) {
     <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
       <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
         <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status?.styles?.[opts.style] || LOOK_STYLES[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
-        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${opts.layout === "gameplay" ? "" : "none"}">Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.</p></div></div>
+        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${["gameplay", "split"].includes(opts.layout) ? "" : "none"}">${opts.layout === "split" ? "A detected webcam fills the top half; gameplay fills the bottom. Without a webcam, the clip uses full-screen gameplay." : "Gameplay + facecam protects the corner webcam PIP during punch-ins automatically."}</p></div></div>
     <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
       ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
     <div class="pd-foot"><span class="hint">Change any of this later on each clip.</span><span class="grow"></span>
@@ -2409,7 +2433,14 @@ document.addEventListener("click", e => {
     dlg.querySelectorAll("[data-layout]").forEach(b => b.setAttribute("aria-pressed", String(b === lay)));
     const why = dlg.querySelector(".pd-look .pd-sub"); if (why) why.textContent = LAYOUT_WHY[lay.dataset.layout] || "";
     const now = dlg.querySelector("#p_now"); if (now) now.textContent = LAYOUT_SHORT[lay.dataset.layout] || lay.dataset.layout;
-    const warn = dlg.querySelector("#p_warn"); if (warn) warn.style.display = lay.dataset.layout === "gameplay" ? "" : "none";
+    const warn = dlg.querySelector("#p_warn");
+    if (warn) {
+      const needsFacecam = ["gameplay", "split"].includes(lay.dataset.layout);
+      warn.style.display = needsFacecam ? "" : "none";
+      warn.textContent = lay.dataset.layout === "split"
+        ? "A detected webcam fills the top half; gameplay fills the bottom. Without a webcam, the clip uses full-screen gameplay."
+        : "Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.";
+    }
     return drawLook();
   }
   const sty = e.target.closest("[data-style]");

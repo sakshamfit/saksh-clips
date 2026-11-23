@@ -389,6 +389,12 @@ def request_render(jid, cid, changes: dict):
         new["style"] = DEFAULTS["style"]
     if new.get("layout") not in render.LAYOUTS:
         new["layout"] = DEFAULTS["layout"]
+    if new.get("layout") in ("gameplay", "split") and not render._has_facecam(new.get("facecam")):
+        source = job.get("source_path") or clip.get("src")
+        found = job.get("facecam") or _facecam_path(source)
+        if found:
+            new["facecam"] = found
+            job["facecam"] = found
     clip.update(new, status="queued")
     save(job)
     _q.put(("clip", jid, cid))
@@ -550,14 +556,8 @@ def _covers(words: list, start: float, end: float) -> bool:
     return len(inside) >= 25 * minutes and inside[-1]["s"] >= start + 0.85 * (end - start)
 
 
-def _facecam(job) -> list | None:
-    """Where the webcam is in the source: once for the whole video, for every clip of it.
-
-    Only a sure answer is used. A box that is a scoreboard drawn over the game would
-    put a picture of a scoreboard in the corner of the clip. One frame is also shown to
-    the AI, which tells a person from a game character better than any measurement can;
-    what it says is measured again on the picture, so it cannot do any harm."""
-    path = job.get("source_path")
+def _facecam_path(path) -> list | None:
+    """Find one sure webcam box in a video file, or return nothing."""
     if not path or not Path(path).is_file():
         return None
     try:
@@ -566,8 +566,20 @@ def _facecam(job) -> list | None:
         return None
     if not box or box.get("conf") != "high":
         return None
-    job["facecam"] = [box["x"], box["y"], box["w"], box["h"]]
-    return job["facecam"]
+    return [box["x"], box["y"], box["w"], box["h"]]
+
+
+def _facecam(job) -> list | None:
+    """Where the webcam is in the source: once for the whole video, for every clip of it.
+
+    Only a sure answer is used. A box that is a scoreboard drawn over the game would
+    put a picture of a scoreboard in the corner of the clip. One frame is also shown to
+    the AI, which tells a person from a game character better than any measurement can;
+    what it says is measured again on the picture, so it cannot do any harm."""
+    found = _facecam_path(job.get("source_path"))
+    if found:
+        job["facecam"] = found
+    return found
 
 
 def _run_job(job):
@@ -798,9 +810,9 @@ def _run_job(job):
                      end=round(c["end"] + shift, 2), edit_beats=shifted_beats, style=o["style"], layout=o["layout"],
                      captions=o.get("captions", True), edit_style=es, auto_edit=(es != "off"),
                      sound_fx=o.get("sound_fx", True), status="queued", version=0)
-            # Only the gameplay layout uses a webcam, so it is only looked for then, and only once: a
+            # Only the facecam layouts need a webcam, so it is looked for then, and only once: a
             # stream with no webcam is not looked for again on every clip of it.
-            if o["layout"] == "gameplay" and face is False:
+            if o["layout"] in ("gameplay", "split") and face is False:
                 face = _facecam(job)
             if face:
                 c["facecam"] = face
