@@ -1156,7 +1156,7 @@ def clips_zip(ids: str = ""):
 def delete_creator(cid: str):
     _throttle("cdel:" + ctx.uid(), 30, 600)
     try:
-        r = account.delete_creator(cid)
+        r = account.delete_creator(cid, stop_live=True)   # a stream being recorded is stopped, not refused
     except account.Busy as e:
         raise HTTPException(409, str(e))
     if not r.get("ok"):

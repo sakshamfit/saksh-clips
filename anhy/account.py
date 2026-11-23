@@ -1,8 +1,11 @@
 """Deleting things for good: one clip, a creator with everything under it, or a whole account.
 
 Nothing here can be undone, so every caller asks the person first. Work in progress is never pulled out from under
-itself: a video still being made, or a stream still being recorded, has to finish or be stopped first."""
+itself: a video still being made has to finish first, and a stream still being recorded is stopped on the spot
+(`delete_creator(..., stop_live=True)`).
+"""
 import shutil
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -111,22 +114,66 @@ def zip_clips(clip_ids: list, limit_gb: float = 4.0) -> Path:
 
 
 # ---------------------------------------------------------------- creators
-def delete_creator(cid: str) -> dict:
-    """Remove a creator, their settings and folder, and every video and clip filed under them."""
+def _forget(cid: str) -> None:
+    """Out of the app's lists straight away, even while the files are still on disk."""
+    with creators._lock:
+        (creators._mem.get(ctx.uid()) or {}).pop(cid, None)
+    ctx.bump()
+
+
+def _remove(cid: str, mine: list) -> None:
+    """The files: every video filed under the creator, then the creator's own folder."""
+    for j in mine:
+        jobs.delete(j["id"])
+    _forget(cid)
+    shutil.rmtree(creators.root(cid), ignore_errors=True)
+    ctx.bump()
+
+
+def _remove_when_stopped(cid: str, s) -> None:
+    """A recording that was just stopped is still wrapping up its last clips in the background. Nothing new is made
+    after Stop, so once it has finished the creator's folder can go without pulling files out from under it."""
+    deadline = time.time() + 10 * 60
+    while not s.finished and time.time() < deadline:
+        time.sleep(0.25)
+    try:
+        _remove(cid, [j for j in jobs.list_jobs() if j.get("creator") == cid])
+    except Exception:  # noqa: BLE001 - it is gone from the app already; a leftover folder is not worth an error
+        pass
+
+
+def _session_for(cid):
+    """The creator's recording: one that is running, or one that was stopped and is still wrapping up."""
+    s = live.active_for(cid)
+    if s:
+        return s
+    u = ctx.uid()
+    return next((x for x in live.SESSIONS.values()
+                 if not x.finished and x.job.get("creator") == cid and x.job.get("user") == u), None)
+
+
+def delete_creator(cid: str, stop_live: bool = False) -> dict:
+    """Remove a creator, their settings and folder, and every video and clip filed under them.
+
+    With `stop_live` (what the page sends once the person has confirmed) a stream that is being recorded is stopped
+    first instead of saying no: the creator and their videos disappear from the app at once, and the files go as
+    soon as the recording has wrapped up."""
     c = creators.get(cid)
     if not c:
         return {"ok": False}
-    if live.active_for(cid):
+    s = _session_for(cid)
+    if s and not stop_live:
         raise Busy("This creator is being recorded. Stop the recording first.")
+    skip = s.job["id"] if s else None
     mine = [j for j in jobs.list_jobs() if j.get("creator") == cid]
-    if any(_busy(j) for j in mine):
+    if any(_busy(j) for j in mine if j["id"] != skip):
         raise Busy("One of this creator's videos is still being made. Wait for it to finish first.")
-    for j in mine:
-        jobs.delete(j["id"])
-    with creators._lock:
-        creators._mine().pop(cid, None)
-    shutil.rmtree(creators.root(cid), ignore_errors=True)
-    ctx.bump()
+    if s:
+        s.stop("Creator deleted")
+        _forget(cid)
+        threading.Thread(target=ctx.bind(lambda: _remove_when_stopped(cid, s)), daemon=True).start()
+        return {"ok": True, "videos": len(mine), "recording_stopped": True}
+    _remove(cid, mine)
     return {"ok": True, "videos": len(mine)}
 
 
