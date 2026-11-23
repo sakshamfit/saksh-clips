@@ -1,12 +1,15 @@
 """Deleting clips, videos, creators and accounts, bulk actions and the zip download. Runs against the code directly,
 with its own empty data folder: nothing outside it is touched."""
-import os, sys, tempfile, zipfile
+import os, sys, tempfile, time, zipfile
 os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-del-"); os.environ["DATABASE_URL"] = ""
 sys.path.insert(0, ".")
 from pathlib import Path
 import sqlalchemy as sa
-from anhy import account, auth, config, creators, ctx, db, jobs
+from anhy import account, auth, config, creators, ctx, db, jobs, live, load, tools
 db.init()
+load.busy = lambda: False
+live.Session.start = lambda self: live.SESSIONS.__setitem__(self.job["id"], self)   # no threads in tests
+tools.missing = lambda: None                                                        # no ffmpeg needed here
 fails = []
 def check(n, ok, x=""):
     print(("PASS " if ok else "FAIL ") + n + (f"  {x}" if x else "")); ok or fails.append(n)
@@ -46,6 +49,25 @@ with ctx.as_user(b.id):
 with ctx.as_user(a.id):
     r = account.delete_creator(c["id"])
     check("deleting a creator removes their videos and folder", r["ok"] and r["videos"] == 1 and not jobs.get(j2["id"]) and not creators.get(c["id"]) and not creators.root(c["id"]).exists(), str(r))
+    # a creator that is being recorded: removing them stops the recording instead of saying no
+    c_live = creators.create({"name": "On Air", "channel": "https://www.twitch.tv/onair"})
+    live_job = live.start_session(c_live)
+    sess = live.SESSIONS[live_job["id"]]
+    try:
+        account.delete_creator(c_live["id"]); refused = False
+    except account.Busy:
+        refused = True
+    check("a creator being recorded is not deleted by accident", refused and creators.get(c_live["id"]) is not None and not sess.user_stopped)
+    r = account.delete_creator(c_live["id"], stop_live=True)
+    check("deleting a live creator stops the recording and removes them",
+          r["ok"] and r.get("recording_stopped") and not creators.get(c_live["id"]) and sess.user_stopped and live.active_for(c_live["id"]) is None, str(r))
+    sess.finished = True                                    # what the recording does once its last clips are done
+    for _ in range(80):
+        if not creators.root(c_live["id"]).exists():
+            break
+        time.sleep(0.05)
+    check("...and their folder goes once the recording has wrapped up",
+          not creators.root(c_live["id"]).exists() and not jobs.get(live_job["id"]))
     try:
         account.delete_account(a.id); ok = False
     except account.Busy: ok = True

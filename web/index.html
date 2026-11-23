@@ -213,6 +213,19 @@ img.avatar.ring{background:transparent}
 .sb-tag.rec{background:#E5323F;color:#fff}
 .nav-item.on .sb-tag{background:#E5323F;color:#fff}
 .app.mini .sb-tag{display:none}
+/* ---------- remove a creator, right in the sidebar */
+.nav-row{position:relative;display:flex;min-width:0}
+.nav-row>.nav-item{padding-right:32px}
+.nav-x{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:24px;height:24px;display:grid;place-items:center;padding:0;border:0;border-radius:7px;background:transparent;color:var(--frame-dim);cursor:pointer;opacity:0;transition:opacity .12s ease,background-color .15s ease,color .15s ease}
+.nav-x svg{width:14px;height:14px}
+.nav-row.live .nav-x{opacity:.85}
+.nav-row.live:hover .nav-x{opacity:1}
+.nav-row:hover .nav-x,.nav-row:focus-within .nav-x{opacity:1}
+.nav-x:hover{background:rgba(248,113,113,.18);color:#FF8A8A}
+.nav-item.on ~ .nav-x{color:var(--brand-ink)}
+.nav-item.on ~ .nav-x:hover{background:rgba(42,26,18,.16);color:var(--brand-ink)}
+.app.mini .nav-x{display:none}
+@media (hover:none){.nav-x{opacity:.65}}
 
 /* ---------- buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line-2);background:#fff;color:var(--text);cursor:pointer;text-decoration:none;white-space:nowrap;font-weight:600}
@@ -1580,13 +1593,17 @@ function moveInd() {
   lastInd = {x, w};
 }
 function drawShell() {  const nav = (v, icon, label, extra = "") => `<button class="nav-item ${S.view === v ? "on" : ""}" data-act="go" data-v="${esc(v)}" title="${esc(label)}">${icon}<span class="label">${esc(label)}</span>${extra}</button>`;
+  // one creator: the workspace button, and a small × beside it to remove the creator without opening it. The ×
+  // stands out on a creator who is live or recording, since that is when you most want one to hand.
+  const cnav = c => { const on = liveOn(c);
+    return `<div class="nav-row${c.live_job || on.length ? " live" : ""}">${nav("c:" + c.id, cav(c), c.name,
+      c.live_job ? `<span class="sb-tag rec" title="Recording now"><i></i>Rec</span>`
+        : on.length ? `<span class="sb-tag" title="Live on ${esc(on.map(([k]) => PLAT[k].name).join(" and "))}"><i></i>Live</span>` : "")}<button class="nav-x" data-act="delcreator" data-id="${esc(c.id)}" title="Remove ${esc(c.name)}" aria-label="Remove ${esc(c.name)}">${ic("x")}</button></div>`; };
   put($("#nav"), nav("overview", navIc("home", "overview"), "Home") +
     nav("library", navIc("film", "library"), "All videos", (() => { const w = S.jobs.filter(j => ["queued", "running"].includes(j.status)).length;
       return w ? `<span class="working" title="${w} working now"><i></i>${w} working</span>` : S.jobs.length ? `<span class="count">${S.jobs.length}</span>` : ""; })()) +
     `<h4><span>Creators</span></h4>` +
-    S.creators.map(c => nav("c:" + c.id, cav(c), c.name,
-      c.live_job ? `<span class="sb-tag rec" title="Recording now"><i></i>Rec</span>`
-        : liveOn(c).length ? `<span class="sb-tag" title="Live on ${esc(liveOn(c).map(([k]) => PLAT[k].name).join(" and "))}"><i></i>Live</span>` : "")).join("") +
+    S.creators.map(cnav).join("") +
     `<button class="nav-item" data-act="newcreator" title="New creator">${ic("plusc")}<span class="label">New creator</span></button>` +
     (S.status.user?.role === "admin" && S.status.accounts !== false ? `<h4><span>Owner</span></h4><a class="nav-item" href="/admin" title="Admin dashboard" style="text-decoration:none">${ic("shield")}<span class="label">Admin dashboard</span></a>` : ""));
   const st = S.status;
@@ -2842,7 +2859,7 @@ function drawCreatorForm() {
         <label class="f">Who can see posts (YouTube, TikTok)<select data-k="privacy">${opts({public:"Public", unlisted:"Unlisted", private:"Private"}, c.privacy)}</select></label>
         <label class="f">Campaign pay per 1,000 views ($)<input data-k="rate_per_1k" type="number" step="0.1" min="0" value="${c.rate_per_1k}"></label>
         <label class="f span">Line added to every post (credit, campaign tag)<input data-k="post_footer" value="${esc(c.post_footer)}" placeholder="Clipped from @streamer"></label></div></div>
-    <div class="card danger-card"><h2>Delete this creator</h2><p class="help">Removes ${esc(c.name)}, their settings and every video and clip filed under them. This cannot be undone.</p>
+    <div class="card danger-card"><h2>Delete this creator</h2><p class="help">Removes ${esc(c.name)}, their settings and every video and clip filed under them${c.live_job ? ", and stops the recording that is running now" : ""}. This cannot be undone.</p>
       <button class="btn danger" data-act="delcreator">${ic("trash")}Delete creator</button></div>
     <div class="savebar" id="savebar"><span>${ic("warn")}You have unsaved changes</span><button class="btn ghost" data-act="cdiscard">Discard</button><button class="btn primary" data-act="csave">${ic("check")}Save changes</button></div>`;
 }
@@ -3403,12 +3420,14 @@ document.addEventListener("click", async e => {
       return toast(`Deleted ${r.videos} video${r.videos === 1 ? "" : "s"} and ${r.clips} clip${r.clips === 1 ? "" : "s"}` + (r.skipped ? `. ${r.skipped} still being made were left alone.` : ""), "ok");
     }
     if (a === "delcreator") {
-      const c = creator(); if (!c) return;
-      const n = S.jobs.filter(j => j.creator === c.id).length;
-      if (!await askTyped(`Delete ${c.name}?`, `This removes the creator, their settings${n ? `, and their ${n} video${n === 1 ? "" : "s"} with all the clips` : ""} for good. It cannot be undone.`, c.name, "Delete creator")) return;
+      const c = (d.id && S.creators.find(x => x.id === d.id)) || creator(); if (!c) return;
+      const n = S.jobs.filter(j => j.creator === c.id).length, rec = !!c.live_job;
+      if (!await askTyped(`Delete ${c.name}?`, `This removes the creator, their settings${n ? `, and their ${n} video${n === 1 ? "" : "s"} with all the clips` : ""} for good.${rec ? " The recording is stopped too." : ""} It cannot be undone.`, c.name, "Delete creator")) return;
       await api(`/api/creators/${encodeURIComponent(c.id)}`, {method:"DELETE"});
+      const here = creatorId() === c.id;
       S.creators = S.creators.filter(x => x.id !== c.id); S.jobs = S.jobs.filter(j => j.creator !== c.id);
-      go("overview"); toast("Creator deleted", "ok"); return tick();
+      if (here) go("overview");
+      toast(rec ? "Creator deleted. The recording was stopped." : "Creator deleted", "ok"); return tick();
     }
     if (a === "delaccount") {
       const me = S.status.user;
