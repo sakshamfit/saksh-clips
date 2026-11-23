@@ -12,9 +12,9 @@ stream and clip the highlights while the stream is still running.
 
 ## What it does
 
-- **Clips from any video.** You choose the framing and the caption style before anything is made, with a preview
-  drawn from the video itself; then it transcribes the audio, asks an AI which moments would hold a stranger's
-  attention, and renders each one in that style.
+- **Clips from any video.** Choose framing—including facecam-in-corner gameplay or a half-streamer,
+  half-gameplay split—and caption style before anything is made, with a preview drawn from the video itself.
+  Then it transcribes the audio, asks an AI which moments would hold a stranger's attention, and renders each one in that style.
 - **A video already on your computer.** Press **From a folder**, open the folder your video was downloaded to and
   pick it: nothing is uploaded and nothing is downloaded again, clipping starts on the file itself
   (see [below](#a-video-that-is-already-on-your-computer)).

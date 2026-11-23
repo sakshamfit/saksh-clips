@@ -61,6 +61,7 @@ try:
 
     # ---- the job hands the webcam on to the render
     from anhy import jobs
+    check("split framing is accepted in clip settings", jobs.clean_options({"layout": "split"})["layout"], "split")
     job = {"source_path": cam}
     box = jobs._facecam(job)
     check("the job finds the webcam for its clips", bool(box), True)
@@ -110,6 +111,28 @@ try:
     check("without a webcam the game simply fills the screen",
           "scale=1080:1920" in render._filter("gameplay", 1920, None) and "overlay=" not in render._filter("gameplay", 1920, None), True)
     check("the layout is offered to the user", "gameplay" in render.LAYOUTS, True)
+
+    # ---- the split layout puts the streamer above a crop of gameplay
+    cam_box = [980, 35, 250, 180]
+    gx, gy, gw, gh = render._split_game_crop(1280, 720, cam_box)
+    check("the lower gameplay crop avoids the webcam when there is room",
+          not (gx < cam_box[0] + cam_box[2] + 25 and gx + gw > cam_box[0] - 25
+               and gy < cam_box[1] + cam_box[3] + 14 and gy + gh > cam_box[1] - 14), True)
+    split = render._filter("split", 1920, cam_box, src_w=1280, src_h=720)
+    check("the split layout is offered to the user", "split" in render.LAYOUTS, True)
+    check("split fills a vertical clip and places the hook over gameplay",
+          render.geometry(1280, 720, "split"), ("split", 1920, 1075, 1670))
+    check("portrait sources can keep the split framing", render.geometry(720, 1280, "split")[0], "split")
+    check("the streamer crop fills the upper half", "crop=250:180:980:35" in split and "scale=1080:960" in split, True)
+    check("the two equal panels are stacked", "vstack=inputs=2" in split and f"y={render.SPLIT_H - 2}" in split, True)
+    check("without a webcam the split layout safely fills the screen",
+          "scale=1080:1920" in render._filter("split", 1920, None) and "vstack=" not in render._filter("split", 1920, None), True)
+    graph_check = subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                                  "testsrc2=size=1280x720:rate=10:d=0.6", "-filter_complex", split,
+                                  "-map", "[v1]", "-frames:v", "3", "-f", "null", "-"],
+                                 capture_output=True, text=True)
+    check("the split filter graph renders without an FFmpeg error", graph_check.returncode, 0)
+
     # the heading must not run under the webcam picture
     pip_h = 380 * 376 / 363
     check("the heading goes below the webcam picture", render._hook_y("gameplay", 300, [0, 0, 363, 376]) > 26 + pip_h, True)

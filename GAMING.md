@@ -70,9 +70,13 @@ A gaming stream is a 16:9 game with a small webcam picture in one corner. Anhy C
 below — fine for a talking head, poor for a game, where the play is a thin strip
 of the picture.
 
-The new **gameplay** layout fills the 1080x1920 frame with the game (centre
+The **gameplay** layout fills the 1080x1920 frame with the game (centre
 cropped, the same as "Fill screen") and puts the webcam in the top corner of it,
-so the viewer sees the play and the face at once.
+so the viewer sees the play and the face at once. The **split** layout is another
+choice: the detected streamer fills the upper half, and a crop of the game fills
+the lower half. The game crop avoids the webcam box when there is room; motion
+and punch-ins are applied to gameplay only. If no webcam can be found, either
+facecam layout falls back to full-screen gameplay.
 
 To do that, Anhy Clips has to know where the webcam is. `anhy/facecam.py` finds it
 by the one thing a webcam always has and a game almost never has: **a straight
