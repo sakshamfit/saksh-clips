@@ -217,7 +217,11 @@ def install_fonts():
 
 
 LAYOUTS = {"blur": "Full frame + blurred fill", "zoom": "Zoomed in + blurred fill", "crop": "Fill the screen (centre crop)",
-           "gameplay": "Gameplay fills the screen, facecam in the corner"}
+           "gameplay": "Gameplay fills the screen, facecam in the corner",
+           "split": "Half streamer, half gameplay"}
+
+# The layouts that show the webcam as a picture of its own, so it must be found first and kept sharp
+FACECAM_LAYOUTS = ("gameplay", "split")
 
 
 def _ts(t):
@@ -250,13 +254,17 @@ def _groups(words, per):
 def geometry(src_w, src_h, layout):
     """Where the video sits in the 1080x1920 frame, and where hook and captions go."""
     if src_h >= src_w and layout != "crop":
-        layout = "crop"  # already vertical or square: nothing to gain from a blurred fill
+        layout = "crop"  # already vertical or square: nothing to gain from a blurred fill or a split
     if layout == "blur":
         fg_h = min(H, int(round(W * src_h / src_w / 2)) * 2)
     elif layout == "zoom":
         fg_h = 1000
     else:
         fg_h = H
+    if layout == "split":
+        # Half streamer on top, half gameplay underneath: the seam is at H/2, so the hook goes just below
+        # it — over the top of the game, not over the face — and the captions in the game half below that.
+        return layout, fg_h, H // 2 + 200, 1560
     top = (H - fg_h) // 2
     if layout in ("crop", "gameplay"):
         return layout, fg_h, 300, 1380
@@ -776,7 +784,8 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
     sound_req = bool(clip.get("sound_fx", True))
     start, end = float(clip.get("start", 0.0)), float(clip.get("end", 0.0))
     dur = max(0.0, end - start)
-    facecam_safe = bool(layout == "gameplay" and facecam and len(facecam) == 4 and facecam[2] > 8)
+    facecam_layout = layout in FACECAM_LAYOUTS          # the webcam is shown on its own: it must stay still
+    facecam_safe = bool(facecam_layout and facecam and len(facecam) == 4 and facecam[2] > 8)
 
     def _empty(skipped_reason: str, signals: list[str] | None = None) -> dict:
         sigs = signals or []
@@ -1006,7 +1015,7 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
                 zoom = cfg[f"zoom_{role}"]
 
             # Slightly restrain gameplay background zoom so gameplay action stays legible
-            if layout == "gameplay":
+            if facecam_layout:
                 zoom = round(1.0 + (zoom - 1.0) * 0.82, 3)
 
             hold = min(cfg[f"hold_{role}"], max(0.45, (effective_dur - remapped_t) - cfg["ease_in"] - cfg["ease_out"] - 0.12))
@@ -1034,7 +1043,7 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
                 "ease_out": cfg["ease_out"],
                 "pan_x": pan_x,
                 "pan_y": pan_y,
-                "impact_shake": round(cfg["impact_shake"] * (0.6 if layout == "gameplay" else 1.0), 2) if role == "payoff" else 0.0,
+                "impact_shake": round(cfg["impact_shake"] * (0.6 if facecam_layout else 1.0), 2) if role == "payoff" else 0.0,
                 "impact_flash": round(cfg["impact_flash"], 3) if role == "payoff" else 0.0,
                 "sound": snd,
                 "source": item["source"],
@@ -1050,7 +1059,7 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
     # Build alternating multi-cam angle windows on jump-cut segments (odd segments get a crisp studio medium punch-in)
     angle_segments = []
     if len(segments) > 1 and cfg.get("cut_alt_zoom", 0.0) > 0.0:
-        alt_z = cfg["cut_alt_zoom"] * (0.65 if layout == "gameplay" else 1.0)
+        alt_z = cfg["cut_alt_zoom"] * (0.65 if facecam_layout else 1.0)
         cursor = 0.0
         for idx_seg, (s0, e0) in enumerate(segments):
             seg_len = round(e0 - s0, 3)
@@ -1078,7 +1087,7 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
             }
 
     # Continuous subtle living dolly creep so no shot ever feels dead static
-    dolly_drift = round(cfg.get("dolly_drift", 0.0) * (0.65 if layout == "gameplay" else 1.0), 4) if effective_dur >= 4.0 else 0.0
+    dolly_drift = round(cfg.get("dolly_drift", 0.0) * (0.65 if facecam_layout else 1.0), 4) if effective_dur >= 4.0 else 0.0
 
     # Color & clarity treatment (film S-curve + split tone + clarity sharpen + vignette + climax flash pop)
     payoff_beat = next((b for b in beats if b["role"] == "payoff"), None)
@@ -1165,7 +1174,9 @@ def plan_edits(clip: dict, words: list, src: Path | None = None, layout: str = "
         treatments.append({
             "kind": "framing",
             "label": "Facecam protected",
-            "detail": "Motion & impact shake applied to gameplay layer only so top-right facecam stays sharp and uncropped",
+            "detail": ("Motion & impact shake applied to the game half only so the face stays sharp and uncropped"
+                       if layout == "split" else
+                       "Motion & impact shake applied to gameplay layer only so top-right facecam stays sharp and uncropped"),
             "sound": False,
         })
 
@@ -1355,12 +1366,71 @@ def _jump_cut_video_prefix(plan: dict) -> tuple[str, str]:
     return "".join(parts), "[vin]"
 
 
-def _filter(layout, fg_h, facecam=None, plan=None):
+def _gameplay_region(facecam, src_w: int, src_h: int) -> tuple[int, int, int, int]:
+    """The part of the picture that is the game, for the split layout, as (x, y, w, h) in source pixels.
+
+    The webcam is cut out of the picture here, so it is not shown twice: of the four strips of picture
+    around it (left, right, above, below) the one that keeps the most of itself when it is fitted into the
+    half of the frame it goes into is used. A webcam in the middle of the picture leaves no such strip, and
+    the whole picture is used then: better a webcam seen twice than a thin sliver of the game.
+    """
+    x, y, w, h = 0, 0, int(src_w or 0), int(src_h or 0)
+    if not w or not h or not facecam or len(facecam) != 4:
+        return x, y, w, h
+    fx, fy, fw, fh = (int(v) for v in facecam)
+    if fw <= 8 or fh <= 8:
+        return x, y, w, h
+    x1, y1 = fx + fw, fy + fh
+    half = H // 2
+    best = None
+    for sx, sy, sw, sh in ((0, 0, fx, h), (x1, 0, w - x1, h), (0, 0, w, fy), (0, y1, w, h - y1)):
+        if sw < 8 or sh < 8:
+            continue
+        share = (sw * sh) / float(w * h)                 # how much of the picture this strip is
+        if share < 0.30:
+            continue                                     # a sliver, not the game
+        scale = max(W / sw, half / sh)
+        kept = (W * half) / (sw * scale * sh * scale)    # how much of it survives being fitted to the half
+        key = (round(kept * share, 4), round(share, 4))
+        if best is None or key > best[0]:
+            best = (key, (sx, sy, sw, sh))
+    if not best:
+        return x, y, w, h
+    gx, gy, gw, gh = best[1]
+    # even values: yuv420p cannot hold a half-pixel edge, and the crop must not move a pixel between frames
+    gx, gy = gx - gx % 2, gy - gy % 2
+    return gx, gy, gw - gw % 2, gh - gh % 2
+
+
+def _filter(layout, fg_h, facecam=None, plan=None, src_w: int = 0, src_h: int = 0):
     """Build the 9:16 layout + jump-cut pacing + facecam-safe pro camera motion + film grade filter graph outputting [v1]."""
     plan = plan or {}
     applied = bool(plan.get("applied"))
     grade = _grade_chain(plan) if applied else ""
     prefix, vpad = _jump_cut_video_prefix(plan) if applied else (f"[0:v]fps={config.OUT_FPS},setpts=PTS-STARTPTS[vin];", "[vin]")
+
+    if layout == "split" and facecam and len(facecam) == 4 and facecam[2] > 8:
+        # Half streamer, half gameplay: the webcam fills the top half, the game the bottom half. The two
+        # come from the same picture, so the webcam is cut out of the game half (it would be shown twice);
+        # motion & impact shake run on the game half only, so the face above it stays crisp and still.
+        half = H // 2
+        fx, fy, fw, fh = (int(v) for v in facecam)
+        gx, gy, gw, gh = _gameplay_region(facecam, src_w, src_h)
+        motion = _motion_expr(plan, W, half) if applied else None
+        game_chain = (f"crop={gw}:{gh}:{gx}:{gy},"
+                      f"scale={W}:{half}:force_original_aspect_ratio=increase,crop={W}:{half},setsar=1")
+        if motion:
+            game_chain += "," + motion
+        game_chain += grade
+        cam_grade = ",eq=contrast=1.05:saturation=1.06,unsharp=3:3:0.35:3:3:0.0" if applied else ""
+        cam_chain = (f"crop={fw}:{fh}:{fx}:{fy},"
+                     f"scale={W}:{half}:force_original_aspect_ratio=increase,crop={W}:{half},setsar=1{cam_grade}")
+        return (prefix
+                + f"{vpad}split=2[base][fc];"
+                + f"[base]{game_chain}[b];"
+                + f"[fc]{cam_chain}[p];"
+                + f"[p][b]vstack=inputs=2,drawbox=x=0:y={half - 2}:w={W}:h=4:color=black@0.55:t=fill,"
+                + "setsar=1[v1];")
 
     if layout == "gameplay" and facecam:
         # Facecam-safe composition: motion & impact shake run ONLY on the gameplay layer [b]; the webcam [p]
@@ -1383,7 +1453,7 @@ def _filter(layout, fg_h, facecam=None, plan=None):
                     + f"[fc]{cam_chain}[p];"
                     + f"[b][p]overlay={ox}:{PIP_MARGIN}[v1];")
 
-    if layout == "crop" or (layout == "gameplay" and not facecam):
+    if layout == "crop" or (layout in FACECAM_LAYOUTS and not facecam):
         motion = _motion_expr(plan, W, H) if applied else None
         chain = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1"
         if motion:
@@ -1548,7 +1618,7 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
     start, end = clip["start"], clip["end"]
     layout, fg_h, hook_y, cap_y = geometry(src_w, src_h, clip.get("layout", "blur"))
     face = clip.get("facecam")
-    if layout == "gameplay" and not (face and len(face) == 4):
+    if layout in FACECAM_LAYOUTS and not (face and len(face) == 4):
         layout = "crop"     # no webcam found: the game fills the screen, which is still the right shape
     hook_y = _hook_y(layout, hook_y, face)
 
@@ -1567,7 +1637,8 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
     work = Path(tempfile.mkdtemp(prefix="pk", dir=config.TMP_DIR))
     try:
         result = _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face,
-                            beats=beats, sound_fx=plan["sound_active"], plan=plan)
+                            beats=beats, sound_fx=plan["sound_active"], plan=plan,
+                            src_w=src_w, src_h=src_h)
         return {
             **result,
             "edit_points": beats,
@@ -1580,7 +1651,7 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
 
 
 def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str,
-               face=None, beats=None, sound_fx=True, plan=None) -> dict:
+               face=None, beats=None, sound_fx=True, plan=None, src_w: int = 0, src_h: int = 0) -> dict:
     global _qsv_ok
     (work / f"{name}.ass").write_text(ass, encoding="utf-8")
     (work / "f").mkdir()
@@ -1609,7 +1680,7 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
         audio_plan["opening_intro"] = None
         audio_plan["beats"] = []
 
-    fc = _filter(layout, fg_h, face, plan=plan) + f"[v1]ass={name}.ass:fontsdir=f[v]"
+    fc = _filter(layout, fg_h, face, plan=plan, src_w=src_w, src_h=src_h) + f"[v1]ass={name}.ass:fontsdir=f[v]"
     if has_audio:
         fc += ";" + _edit_audio(audio_plan)
 

@@ -74,6 +74,18 @@ The new **gameplay** layout fills the 1080x1920 frame with the game (centre
 cropped, the same as "Fill screen") and puts the webcam in the top corner of it,
 so the viewer sees the play and the face at once.
 
+**split** — "Half streamer, half gameplay" — is the other way round: the webcam
+fills the top half of the frame and the game the bottom half, the shape a
+reaction clip usually has. The game is taken from the part of the picture the
+webcam does not cover, so the webcam is not shown twice: of the four strips of
+picture around it, the one that keeps the most of itself when it is fitted into
+the half of the frame it goes into is used (`_gameplay_region` in
+`anhy/render.py`). A webcam in the middle of the picture leaves no such strip, and
+then the whole picture is used. The hook sits just under the seam, over the top of
+the game and not over the face, and the captions go in the game half below it. As
+in **gameplay**, motion and impact shake run on the game half only, so the face
+stays sharp and still.
+
 To do that, Anhy Clips has to know where the webcam is. `anhy/facecam.py` finds it
 by the one thing a webcam always has and a game almost never has: **a straight
 border that stays in the same place in every frame**. A wall in the game moves, a

@@ -428,6 +428,8 @@ img.av{object-fit:cover}
 .lay-prev .ph i{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:16px;background:linear-gradient(135deg,#FF8B33,#FFB27A)}
 .lay-prev.zoom .ph i{left:-6px;right:-6px;height:24px}
 .lay-prev.crop .ph i{left:0;right:0;top:0;height:100%;transform:none}
+.lay-prev.split .ph::before{inset:0 0 50% 0;filter:none;opacity:1;background:linear-gradient(160deg,#FFD9A8,#B4643A 55%,#6E4530)}
+.lay-prev.split .ph i{left:0;right:0;top:50%;height:50%;transform:none;background:linear-gradient(135deg,#3E7BD6,#1E3F73)}
 .seg{display:flex;gap:4px;background:#fff;border-radius:10px;padding:4px}
 .composer.compact .seg{background:var(--muted)}
 .seg button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;border:0;border-radius:7px;background:transparent;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s ease,color .15s ease}
@@ -464,6 +466,7 @@ dialog.pickdlg{border:1px solid var(--line);background:#fff;color:var(--text);bo
 .pd .pd-sub{font-size:13px;color:var(--dim);margin-top:-8px}
 .pd h3{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
 .pd-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pd-grid.lay{grid-template-columns:repeat(5,minmax(0,1fr))}
 .pd-grid.caps{grid-template-columns:repeat(3,minmax(0,1fr))}
 .pd-opt{display:flex;flex-direction:column;gap:7px;padding:6px 6px 9px;border:0;border-radius:11px;background:var(--muted);color:var(--dim);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:background-color .15s ease,color .15s ease}
 .pd-opt:hover,.pd-opt:focus-visible{background:#EDE3DB;color:var(--text)}
@@ -1031,6 +1034,8 @@ main{background:var(--bg);border:1px solid var(--line);box-shadow:0 1px 2px rgba
 .lay-prev .ph{background:#27272a}
 .lay-prev .ph i{background:#a1a1aa}
 .lay-prev.crop .ph,.lay-prev.gameplay .ph{background:#52525b}
+.lay-prev.split .ph{background:#52525b}
+.lay-prev.split .ph i{background:#3f3f46}
 .badge{background:rgba(9,9,11,.82);color:#fff}
 .badge.r{background:rgba(9,9,11,.82);color:#fff}
 :root[data-theme="dark"] .chan input{background:#111114;border-color:#2e2e36;color:#fafafa}
@@ -1870,7 +1875,8 @@ function drawAdd(variant) {
     </div></div></form>`;
   drawAtt();
 }
-const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", gameplay:"Gameplay + facecam"};
+const LAYOUT_SHORT = {blur:"Blurred fill", zoom:"Zoomed in", crop:"Fill screen", gameplay:"Gameplay + facecam",
+                     split:"Half streamer, half game"};
 const CAP_LOOK = {bounce:{font:"'Archivo Black'", hl:"#FFFF00", up:true}, hype:{font:"Anton", hl:"#FF3C3C", up:true}, clean:{font:"Poppins", hl:"#6BD7FF", up:false, w:800}};
 function picker(id, aria, items, val) {
   const cur = items.find(x => String(x.v) === String(val)) || items[0];
@@ -2178,9 +2184,16 @@ function sendFile(f, who, options) {
 const PICK = {open: false, resolve: null, opts: null, target: null, look: {}};
 const LOOK_STYLES = {bounce: "Bounce", hype: "Hype", clean: "Clean"};
 const LOOK_LAYOUTS = {blur: "Full frame + blurred fill", zoom: "Zoomed in + blurred fill", crop: "Fill screen (centre crop)",
-                      gameplay: "Gameplay fills the screen, facecam in the corner"};
+                      gameplay: "Gameplay fills the screen, facecam in the corner",
+                      split: "Half streamer, half gameplay"};
 const LAYOUT_WHY = {blur: "The whole picture, with a blurred copy filling the rest.", zoom: "The picture larger, the edges blurred away.",
-                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner."};
+                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner.",
+                    split: "The streamer fills the top half and the game the bottom half."};
+/* What the two facecam layouts promise, under the preview */
+function layoutWarn(layout) {
+  return layout === "split" ? "Half streamer, half gameplay protects the webcam half during punch-ins automatically."
+    : "Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.";
+}
 
 /* What the chooser starts on: the creator's own settings, then whatever was chosen for this creator last time
    (kept in this browser), then the number in the Options panel if it was changed there. Only the four things the
@@ -2252,7 +2265,15 @@ function paintLayout(cv, img, layout) {
   const sw = img.width || 16, sh = img.height || 9, vertical = sh >= sw;
   const drawIn = (dw, dh) => g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
   const cover = () => { const s = Math.max(W / sw, H / sh); drawIn(sw * s, sh * s); };
-  if (layout === "crop" || layout === "gameplay") {
+  if (layout === "split") {
+    const half = Math.round(H / 2), zs = Math.max(W / sw, half / sh) * 1.9;
+    const s = Math.max(W / sw, half / sh);
+    g.drawImage(img, (W - sw * s) / 2, half + (half - sh * s) / 2, sw * s, sh * s);   // the game underneath
+    g.save(); g.beginPath(); g.rect(0, 0, W, half); g.clip();                            // the facecam above
+    g.drawImage(img, (W - sw * zs) / 2, (half - sh * zs) / 2, sw * zs, sh * zs);
+    g.restore();
+    g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, half - 1, W, 2);                     // the seam
+  } else if (layout === "crop" || layout === "gameplay") {
     if (layout === "gameplay" && !vertical) {
       cover();
       const pw = W * 0.34, ph = pw * 0.75;         // the webcam in the corner
@@ -2266,7 +2287,7 @@ function paintLayout(cv, img, layout) {
     const fgW = fgH * sw / sh;
     g.drawImage(img, (W - fgW) / 2, (H - fgH) / 2, fgW, fgH);
   }
-  const top = layout === "crop" || layout === "gameplay" ? H * 0.1 : H * 0.055;
+  const top = layout === "split" ? H * 0.604 : (layout === "crop" || layout === "gameplay") ? H * 0.1 : H * 0.055;
   g.fillStyle = "#fff"; g.globalAlpha = 0.93;
   const bw = W * 0.74, bh = H * 0.042, bx = (W - bw) / 2;
   g.beginPath(); g.roundRect ? g.roundRect(bx, top, bw, bh, bh * 0.4) : g.rect(bx, top, bw, bh); g.fill();
@@ -2292,7 +2313,7 @@ function drawLook() {
   g.textAlign = "center"; g.textBaseline = "middle";
   g.font = `800 ${Math.round(W * 0.075)}px 'Poppins', sans-serif`;      // the hook in its white box
   g.fillStyle = "#14100E";
-  g.fillText("this is the part worth watching", W / 2, (o.layout === "crop" || o.layout === "gameplay") ? H * 0.1 + H * 0.042 / 2 : H * 0.055 + H * 0.042 / 2);
+  g.fillText("this is the part worth watching", W / 2, (o.layout === "split" ? H * 0.604 : (o.layout === "crop" || o.layout === "gameplay") ? H * 0.1 : H * 0.055) + H * 0.042 / 2);
   if (o.captions === false) return;
   const size = Math.round(W * (o.style === "hype" ? 0.2 : o.style === "clean" ? 0.15 : 0.17));
   g.font = `${o.style === "hype" ? "400" : "800"} ${size}px ${o.style === "hype" ? "Anton" : "Poppins"}, sans-serif`;
@@ -2331,7 +2352,7 @@ function drawPick(opts, A) {
       <h2>Choose the look before clipping</h2>
       <p class="pd-sub">${n === 1 ? "Pick framing, captions, and editing intensity before rendering starts."
         : `The same look and editing style will be used for all ${n} videos in this batch.`}</p></div>
-    <div><h3>Framing</h3><div class="pd-grid">${layouts.map(lay).join("")}</div></div>
+    <div><h3>Framing</h3><div class="pd-grid lay">${layouts.map(lay).join("")}</div></div>
     <div><h3>Caption style</h3>
       <label class="sw" style="margin-bottom:10px"><input type="checkbox" id="p_caps" ${opts.captions ? "checked" : ""}>Generate captions</label>
       <div class="pd-grid caps">${styles.map(sty).join("")}</div></div>
@@ -2349,7 +2370,7 @@ function drawPick(opts, A) {
     <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
       <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
         <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status?.styles?.[opts.style] || LOOK_STYLES[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
-        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${opts.layout === "gameplay" ? "" : "none"}">Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.</p></div></div>
+        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${opts.layout === "gameplay" || opts.layout === "split" ? "" : "none"}">${layoutWarn(opts.layout)}</p></div></div>
     <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
       ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
     <div class="pd-foot"><span class="hint">Change any of this later on each clip.</span><span class="grow"></span>
@@ -2409,7 +2430,9 @@ document.addEventListener("click", e => {
     dlg.querySelectorAll("[data-layout]").forEach(b => b.setAttribute("aria-pressed", String(b === lay)));
     const why = dlg.querySelector(".pd-look .pd-sub"); if (why) why.textContent = LAYOUT_WHY[lay.dataset.layout] || "";
     const now = dlg.querySelector("#p_now"); if (now) now.textContent = LAYOUT_SHORT[lay.dataset.layout] || lay.dataset.layout;
-    const warn = dlg.querySelector("#p_warn"); if (warn) warn.style.display = lay.dataset.layout === "gameplay" ? "" : "none";
+    const warn = dlg.querySelector("#p_warn");
+    if (warn) { warn.style.display = (lay.dataset.layout === "gameplay" || lay.dataset.layout === "split") ? "" : "none";
+                warn.textContent = layoutWarn(lay.dataset.layout); }
     return drawLook();
   }
   const sty = e.target.closest("[data-style]");

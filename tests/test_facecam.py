@@ -116,6 +116,42 @@ try:
     check("another picture moves the heading with it",
           render._hook_y("gameplay", 300, [0, 0, 300, 170]) < render._hook_y("gameplay", 300, [0, 0, 363, 376]), True)
     check("without a webcam the heading stays at the top", render._hook_y("crop", 300, None), 300)
+
+    # ---- the split layout: half streamer on top, half game underneath
+    check("the split layout is offered to the user", "split" in render.LAYOUTS, True)
+    check("the split layout is one of the layouts that use a webcam", "split" in render.FACECAM_LAYOUTS, True)
+    f = render._filter("split", 1920, [960, 0, 320, 240], src_w=1280, src_h=720)
+    check("the webcam is cropped out of the source", "crop=320:240:960:0" in f, True)
+    check("the webcam is scaled to the top half", "scale=1080:960" in f, True)
+    check("the game is stacked under the webcam", "vstack=inputs=2" in f and "[p][b]vstack" in f, True)
+    check("the two halves are divided by a line", "drawbox=x=0:y=958:w=1080:h=4" in f, True)
+    check("the game half is not the whole picture (the webcam is not shown twice)",
+          "crop=960:720:0:0" in f, True)
+    check("the game half is cut from the picture before it is fitted to the half",
+          "crop=960:720:0:0,scale=1080:960" in f, True)
+    check("a webcam at the bottom-left of a picture takes the game from the right of it",
+          render._gameplay_region([0, 480, 320, 240], 1280, 720), (320, 0, 960, 720))
+    check("a webcam across the bottom takes the game from above it",
+          render._gameplay_region([0, 540, 1920, 540], 1920, 1080), (0, 0, 1920, 540))
+    check("a webcam across the top takes the game from below it",
+          render._gameplay_region([0, 0, 1920, 270], 1920, 1080), (0, 270, 1920, 810))
+    check("a webcam in the middle of the picture leaves the whole picture",
+          render._gameplay_region([810, 390, 300, 300], 1920, 1080), (0, 0, 810, 1080))
+    check("a webcam too small to matter leaves the whole picture",
+          render._gameplay_region([0, 0, 4, 4], 1280, 720), (0, 0, 1280, 720))
+    check("no webcam at all leaves the whole picture",
+          render._gameplay_region(None, 1280, 720), (0, 0, 1280, 720))
+    check("without a webcam the split layout fills the screen like crop",
+          "vstack" not in render._filter("split", 1920, None, src_w=1280, src_h=720)
+          and "crop=1080:1920" in render._filter("split", 1920, None, src_w=1280, src_h=720), True)
+    lay, fg_h, hook_y, cap_y = render.geometry(1280, 720, "split")
+    check("the split layout keeps the whole frame", (lay, fg_h), ("split", 1920))
+    check("the hook goes just under the seam, in the game half", 960 < hook_y < 1400, True)
+    check("the captions go in the game half, below the hook", cap_y > hook_y + 200, True)
+    check("the heading is not moved by the webcam in the split layout (the webcam is not in a corner)",
+          render._hook_y("split", hook_y, [960, 0, 320, 240]), hook_y)
+    check("a vertical picture has no room for a split and is filled instead",
+          render.geometry(720, 1280, "split")[0], "crop")
 finally:
     shutil.rmtree(work, ignore_errors=True)      # the pictures are big; they must not be left behind
 

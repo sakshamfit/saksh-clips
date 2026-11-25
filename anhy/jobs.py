@@ -798,9 +798,9 @@ def _run_job(job):
                      end=round(c["end"] + shift, 2), edit_beats=shifted_beats, style=o["style"], layout=o["layout"],
                      captions=o.get("captions", True), edit_style=es, auto_edit=(es != "off"),
                      sound_fx=o.get("sound_fx", True), status="queued", version=0)
-            # Only the gameplay layout uses a webcam, so it is only looked for then, and only once: a
-            # stream with no webcam is not looked for again on every clip of it.
-            if o["layout"] == "gameplay" and face is False:
+            # Only the layouts that show the webcam on its own use one, so it is only looked for then, and
+            # only once: a stream with no webcam is not looked for again on every clip of it.
+            if o["layout"] in render.FACECAM_LAYOUTS and face is False:
                 face = _facecam(job)
             if face:
                 c["facecam"] = face
