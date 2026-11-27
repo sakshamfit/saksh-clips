@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import config, roman
+from . import branding, config, roman
 from .media import NO_WINDOW, run
 
 W, H = config.OUT_W, config.OUT_H
@@ -250,7 +250,7 @@ def _groups(words, per):
 
 def geometry(src_w, src_h, layout):
     """Where the video sits in the 1080x1920 frame, and where hook and captions go."""
-    if src_h >= src_w and layout not in ("crop", "split"):
+    if src_h >= src_w and layout not in ("crop", "gameplay", "split"):
         layout = "crop"  # already vertical or square: nothing to gain from a blurred fill
     if layout == "blur":
         fg_h = min(H, int(round(W * src_h / src_w / 2)) * 2)
@@ -1643,15 +1643,93 @@ def _has_audio_stream(src: Path) -> bool:
         return True
 
 
+def _make_watermark_png(path: Path, text: str) -> tuple[int, int]:
+    """Draw a small, high-contrast channel sticker that stays legible over any footage."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    text = branding.clean_watermark_text(text)
+    if not text:
+        raise ValueError("Add banner text before showing the channel banner.")
+
+    scale = max(0.5, W / 1080)
+    height = max(44, int(round(88 * scale)))
+    badge = int(round(46 * scale))
+    pad_left, gap, pad_right = (int(round(x * scale)) for x in (15, 12, 20))
+    margin_x = max(16, int(round(W * 0.045)))
+    max_width = max(80, W - 2 * margin_x)
+    available = max(24, max_width - pad_left - badge - gap - pad_right)
+
+    font_dir = Path(__file__).resolve().parent / "fonts"
+    try:
+        main_font = ImageFont.truetype(str(font_dir / "Poppins-ExtraBold.ttf"), max(14, int(round(34 * scale))))
+        small_font = ImageFont.truetype(str(font_dir / "Poppins-ExtraBold.ttf"), max(8, int(round(13 * scale))))
+        badge_font = ImageFont.truetype(str(font_dir / "Poppins-ExtraBold.ttf"), max(12, int(round(25 * scale))))
+    except OSError:
+        main_font = small_font = badge_font = ImageFont.load_default()
+
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+
+    def width_of(value, font):
+        box = probe.textbbox((0, 0), value, font=font)
+        return box[2] - box[0]
+
+    shown = text
+    if width_of(shown, main_font) > available:
+        while shown and width_of(shown + "…", main_font) > available:
+            shown = shown[:-1]
+        shown = shown.rstrip() + "…"
+    text_width = width_of(shown, main_font)
+    width = min(max_width, pad_left + badge + gap + text_width + pad_right)
+    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    radius = int(round(20 * scale))
+    draw.rounded_rectangle((0, 0, width - 1, height - 1), radius=radius,
+                           fill=(17, 17, 21, 232), outline=(255, 255, 255, 205), width=max(1, int(round(2 * scale))))
+
+    badge_x = pad_left
+    badge_y = (height - badge) // 2
+    draw.ellipse((badge_x, badge_y, badge_x + badge, badge_y + badge), fill=(255, 116, 75, 255))
+    icon_box = draw.textbbox((0, 0), "@", font=badge_font)
+    icon_w, icon_h = icon_box[2] - icon_box[0], icon_box[3] - icon_box[1]
+    draw.text((badge_x + (badge - icon_w) / 2 - icon_box[0],
+               badge_y + (badge - icon_h) / 2 - icon_box[1] - 1 * scale),
+              "@", font=badge_font, fill=(255, 255, 255, 255))
+
+    text_x = badge_x + badge + gap
+    label_y, main_y = int(round(11 * scale)), int(round(32 * scale))
+    draw.text((text_x, label_y), "CHANNEL", font=small_font, fill=(255, 157, 126, 255))
+    draw.text((text_x, main_y), shown, font=main_font, fill=(255, 255, 255, 255))
+    image.save(path, format="PNG", optimize=True)
+    return image.size
+
+
+def _watermark_coords(position: str, width: int, height: int) -> tuple[int, int]:
+    """Inset the banner from the frame edges, away from the bottom progress bar."""
+    if position not in branding.WATERMARK_POSITION_LABELS:
+        position = branding.DEFAULT_WATERMARK_POSITION
+    mx = max(16, int(round(W * 0.045)))
+    my = max(20, int(round(H * 0.035)))
+    x = mx if position.endswith("left") else max(0, W - mx - width)
+    y = my if position.startswith("top") else max(0, H - my - height)
+    return x, y
+
+
 def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, src_w: int, src_h: int) -> dict:
     """Writes <name>.mp4, <name>.jpg and <name>.ass into out_dir. Returns file names, edit_points, and edit_summary."""
     out_dir.mkdir(parents=True, exist_ok=True)
     start, end = clip["start"], clip["end"]
     face = clip.get("facecam")
-    requested_layout = clip.get("layout", "blur")
+    original_layout = clip.get("layout", "blur")
+    requested_layout = original_layout
+    layout_fallback = ""
     if requested_layout in ("gameplay", "split") and not _has_facecam(face):
         requested_layout = "crop"  # without a detectable webcam, fill the screen with the game instead
+        label = LAYOUTS.get(original_layout, original_layout)
+        layout_fallback = f"No webcam was detected. Full-screen gameplay was used instead of {label}."
     layout, fg_h, hook_y, cap_y = geometry(src_w, src_h, requested_layout)
+    if not layout_fallback and layout != requested_layout:
+        label = LAYOUTS.get(original_layout, original_layout)
+        layout_fallback = f"The source is already vertical. Full-screen framing was used instead of {label}."
     hook_y = _hook_y(layout, hook_y, face)
 
     plan = plan_edits(clip, words, src=src, layout=layout, facecam=face)
@@ -1668,10 +1746,20 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
     # Windows temp path never exceeds the 260-character limit and breaks libass filter paths.
     work = Path(tempfile.mkdtemp(prefix="pk", dir=config.TMP_DIR))
     try:
+        watermark = None
+        watermark_text = clip.get("watermark_text")
+        if clip.get("watermark_enabled") and isinstance(watermark_text, str):
+            watermark_text = branding.clean_watermark_text(watermark_text)
+            if watermark_text:
+                watermark = work / "watermark.png"
+                _make_watermark_png(watermark, watermark_text)
         result = _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face,
-                            beats=beats, sound_fx=plan["sound_active"], plan=plan, src_w=src_w, src_h=src_h)
+                            beats=beats, sound_fx=plan["sound_active"], plan=plan, src_w=src_w, src_h=src_h,
+                            watermark=watermark, watermark_position=clip.get("watermark_position", branding.DEFAULT_WATERMARK_POSITION))
         return {
             **result,
+            "layout_requested": original_layout,
+            "layout_fallback": layout_fallback,
             "edit_points": beats,
             "edit_style": plan["style"],
             "sound_fx": plan["sound_fx"],
@@ -1682,7 +1770,8 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
 
 
 def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str,
-               face=None, beats=None, sound_fx=True, plan=None, src_w=None, src_h=None) -> dict:
+               face=None, beats=None, sound_fx=True, plan=None, src_w=None, src_h=None,
+               watermark: Path | None = None, watermark_position: str = branding.DEFAULT_WATERMARK_POSITION) -> dict:
     global _qsv_ok
     (work / f"{name}.ass").write_text(ass, encoding="utf-8")
     (work / "f").mkdir()
@@ -1711,12 +1800,22 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
         audio_plan["opening_intro"] = None
         audio_plan["beats"] = []
 
-    fc = _filter(layout, fg_h, face, plan=plan, src_w=src_w, src_h=src_h) + f"[v1]ass={name}.ass:fontsdir=f[v]"
+    if watermark:
+        from PIL import Image
+        with Image.open(watermark) as sticker:
+            wm_w, wm_h = sticker.size
+        wm_x, wm_y = _watermark_coords(watermark_position, wm_w, wm_h)
+        fc = (_filter(layout, fg_h, face, plan=plan, src_w=src_w, src_h=src_h)
+              + f"[v1]ass={name}.ass:fontsdir=f[v2];[v2][1:v]overlay={wm_x}:{wm_y}:format=auto:eof_action=repeat[v]")
+    else:
+        fc = _filter(layout, fg_h, face, plan=plan, src_w=src_w, src_h=src_h) + f"[v1]ass={name}.ass:fontsdir=f[v]"
     if has_audio:
         fc += ";" + _edit_audio(audio_plan)
 
-    base = ["ffmpeg", "-y", "-v", "error", "-ss", f"{float(start):.2f}", "-t", f"{dur:.2f}", "-i", str(src),
-            "-filter_complex", fc, "-map", "[v]"]
+    base = ["ffmpeg", "-y", "-v", "error", "-ss", f"{float(start):.2f}", "-t", f"{dur:.2f}", "-i", str(src)]
+    if watermark:
+        base += ["-loop", "1", "-framerate", str(config.OUT_FPS), "-i", watermark.name]
+    base += ["-filter_complex", fc, "-map", "[v]"]
     if has_audio:
         base += ["-map", "[a]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
     else:

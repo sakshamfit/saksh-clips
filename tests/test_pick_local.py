@@ -131,7 +131,9 @@ finally:
 before = len(c.get("/api/jobs").json())
 r = c.post("/api/jobs/local", json={"path": str(big), "options": {"max_clips": 3, "layout": "zoom"}, "creator": ""}, headers=ORIGIN)
 if i["problem"]:
-    check("a video that cannot be read is refused with the reason", (r.status_code, i["problem"][:20] in r.text), (422, True))
+    # ffprobe includes a process-specific memory address in this diagnostic, so compare its stable reason, not the prefix.
+    check("a video that cannot be read is refused with the reason",
+          (r.status_code, "Invalid data found when processing input" in r.text), (422, True))
     check("...and no video is left half made", len(c.get("/api/jobs").json()), before)
 else:
     job = r.json()

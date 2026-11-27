@@ -658,7 +658,9 @@ def _creator_rows():
         if profiles.needs_refresh(c):
             profiles.refresh(c["id"])
         s = live.active_for(c["id"])
-        out.append({**c, "live_job": s.job["id"] if s else None, "log": creators.read_log(c["id"], 30)})
+        out.append({**c, "live_job": s.job["id"] if s else None,
+                    "live_state": s.recording_state() if s else None,
+                    "log": creators.read_log(c["id"], 30)})
     return out
 
 
@@ -703,7 +705,7 @@ def get_job(jid: str):
 def link_preview(request: Request, url: str = ""):
     url = url.strip()[:500]
     if not media.site_allowed(url):
-        raise HTTPException(400, "Paste a full link to a YouTube, Twitch or Kick video.")
+        raise HTTPException(400, "Paste a full link to a YouTube, Twitch, Kick or JioHotstar video.")
     try:
         auth.throttle(f"preview:{_me(request).id}", 12, 60)
     except auth.AuthError:
@@ -727,7 +729,7 @@ def create_from_link(body: dict = Body(...)):
     _throttle("newjob:" + ctx.uid(), 30, 600)
     url = str(body.get("url", "")).strip()[:500]
     if not media.site_allowed(url):
-        raise HTTPException(400, "Paste a full link to a YouTube, Twitch or Kick video.")
+        raise HTTPException(400, "Paste a full link to a YouTube, Twitch, Kick or JioHotstar video.")
     try:
         media.check_youtube(url)          # YouTube is refusing us right now: say so, rather than queue a job that fails
     except media.YouTubeBlocked as e:
@@ -1203,7 +1205,8 @@ def _channel_ok(body: dict):
             raise HTTPException(400, f"That link isn't a {plat.title()} channel.")
         links.append(url)
     for ch in links:
-        if ch and not media.site_allowed(live.normalize(ch)):
+        normalized = live.normalize(ch) if ch else ""
+        if ch and (not creators.platform_key(normalized) or not media.site_allowed(normalized)):
             raise HTTPException(400, "Channel links must be from YouTube, Twitch or Kick.")
 
 
@@ -1291,7 +1294,8 @@ def my_photo(request: Request):
 @app.get("/api/channel-preview")
 def channel_preview(request: Request, url: str = ""):
     url = url.strip()[:300]
-    if not url or not media.site_allowed(live.normalize(url)):
+    normalized = live.normalize(url) if url else ""
+    if not url or not creators.platform_key(normalized) or not media.site_allowed(normalized):
         raise HTTPException(400, "Paste a YouTube, Twitch or Kick channel link.")
     try:
         auth.throttle(f"chanprev:{_me(request).id}", 12, 60)

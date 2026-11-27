@@ -217,7 +217,8 @@ MAX_LIVE_HOURS = _limit("ANHY_MAX_LIVE_HOURS")                # a recording stop
 MAX_USER_GB = _limit("ANHY_MAX_USER_GB")                      # disk space one account may fill
 MAX_CREATORS = int(_limit("ANHY_MAX_CREATORS"))               # creators one account may add
 ALLOWED_SITES = tuple(s.strip().lower() for s in env(
-    "ANHY_ALLOWED_SITES", "youtube.com,youtu.be,twitch.tv,kick.com").split(",") if s.strip())
+    "ANHY_ALLOWED_SITES", "youtube.com,youtu.be,twitch.tv,kick.com,hotstar.com,jiohotstar.com").split(",") if s.strip())
+HOTSTAR_COOKIES_FILE = (env("ANHY_HOTSTAR_COOKIES_FILE") or "").strip()
 
 # A video that is already in a folder on this computer can be clipped from there: no download, no upload (see
 # anhy/local.py). Only the owner of this computer, or the admin of a server, may look through its folders.
