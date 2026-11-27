@@ -163,6 +163,7 @@ main{background:var(--bg);margin:8px 8px 8px 0;border-radius:var(--r-lg);height:
 .sbadge i{width:6px;height:6px;border-radius:50%;background:currentColor}
 .sbadge.live{background:#FDECEC;color:#C53030}.sbadge.live i,.sbadge.rec i{animation:pulse 1.3s infinite}
 .sbadge.rec{background:#E5323F;color:#fff}
+.sbadge.bad{background:var(--bad-soft);color:var(--bad)}
 .sbadge svg{width:12px;height:12px}
 .sbadge{white-space:nowrap;max-width:100%}
 .topbar .titles{overflow:hidden}
@@ -717,6 +718,13 @@ dialog::backdrop{background:rgba(14,12,11,.42);animation:fadein .16s ease}
 .editor{display:grid;grid-template-columns:minmax(240px,340px) minmax(300px,450px);max-height:calc(100vh - 48px)}
 .editor .stage{background:#17110E;display:grid;place-items:center;position:relative;min-height:320px}
 .editor video,.editor .stage img{width:100%;max-height:calc(100vh - 48px);aspect-ratio:9/16;object-fit:contain;display:block}
+.channel-sticker-preview{position:absolute;z-index:2;display:flex;align-items:center;gap:5px;max-width:86%;padding:3px 7px 3px 3px;border:1px solid rgba(255,255,255,.8);border-radius:8px;background:rgba(17,17,21,.92);color:#fff;pointer-events:none}
+.channel-sticker-preview .mark{width:18px;height:18px;border-radius:50%;background:#ff744b;display:grid;place-items:center;flex:none;font-size:12px;font-weight:700;line-height:1}
+.channel-sticker-preview .copy{display:flex;flex-direction:column;min-width:0;line-height:1.1}
+.channel-sticker-preview small{font-size:5px;font-weight:700;letter-spacing:.08em;color:#ff9d7e}
+.channel-sticker-preview b{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:700}
+.channel-sticker-preview.wm-top-left{top:4%;left:4%}.channel-sticker-preview.wm-top-right{top:4%;right:4%}
+.channel-sticker-preview.wm-bottom-left{bottom:5%;left:4%}.channel-sticker-preview.wm-bottom-right{bottom:5%;right:4%}
 .editor .panel{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:14px}
 .editor h3{font-size:13px;font-weight:600;color:var(--dim);margin-top:6px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1287,7 +1295,7 @@ function startTour() {
   const steps = [
     {t: "Welcome to Anhy Clips", x: "Long videos and live streams go in, captioned vertical clips come out. Here is a quick look around.",
      chips: [["link", "Paste a link"], ["scissors", "Get clips", 1], ["radio", "Live streams"], ["send", "Post them"]]},
-    {t: "Start with any video", x: "Paste a YouTube, Twitch or Kick link here, upload a file, or pick a video that is already in a folder on this computer — that one is never uploaded or downloaded again. Anhy Clips finds the best moments and makes each one a short with captions.",
+    {t: "Start with any video", x: "Paste a YouTube, Twitch, Kick or JioHotstar video link, upload a file, or pick a video that is already in a folder on this computer — that one is never uploaded or downloaded again. Anhy Clips finds the best moments and makes each one a short with captions.",
      sel: "#addform", dock: "bottom", chips: [["link", "YouTube"], ["link", "Twitch"], ["up", "Upload"], ["folder", "From a folder", 1]]},
     {t: "Your day at a glance", x: "Home shows what is recording, how many clips were made and posted today, and what is waiting to go out.",
      sel: "#ov .tiles", dock: "bottom", chips: [["radio", "Recording"], ["scissors", "Clips today", 1], ["send", "Posted"], ["clock", "Waiting"]]},
@@ -1454,18 +1462,27 @@ function drawStream() {
   }
   const stats = [p.viewers != null ? [fmtK(p.viewers), "watching"] : null, p.started ? [since(p.started), "live for"] : null,
                  p.followers ? [p.followers.split(" ")[0], p.followers.split(" ").slice(1).join(" ")] : null].filter(Boolean);
-  const rec = c.live_job;
+  const rec = c.live_job, recState = c.live_state || "connecting";
+  const recNote = recState === "recording" ? "Recording audio and video. Clips appear below as they're made."
+    : recState === "error" ? "Capture failed. See the recording below for the error."
+    : recState === "finishing" ? "Capture has stopped. Finishing any clips already in progress."
+    : "Connecting to the stream. Recording starts after audio and video reach the buffer.";
   put(box.querySelector(".sinfo"), `<div class="top">${platLogo(k)}<span class="lv"><i></i>Live on ${PLAT[k].name}</span>
       ${on.length > 1 ? `<div class="splat">${on.map(([x]) => `<button class="${x === k ? "on" : ""}" data-act="spick" data-p="${x}" title="Watch on ${PLAT[x].name}">${PLAT[x].svg}</button>`).join("")}</div>` : ""}</div>
     <h3>${esc(p.title || "Live now")}</h3><p class="by">${esc(p.name || c.name)}</p>
     ${stats.length ? `<div class="sstats">${stats.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("")}</div>` : ""}
     <div class="cta">${rec
-      ? `<button class="btn danger" data-act="stoplive" data-j="${esc(rec)}">${ic("stop")}Stop recording</button><small>Recording now. Clips appear below as they're made.</small>`
+      ? `<button class="btn ${recState === "error" ? "" : "danger"}" data-act="stoplive" data-j="${esc(rec)}" ${["error", "finishing"].includes(recState) ? "disabled" : ""}>${recState === "error" ? "Capture failed" : recState === "finishing" ? "Finishing clips…" : `${ic("stop")}Stop recording`}</button><small>${recNote}</small>`
       : `<button class="btn primary" data-act="golive" data-url="${esc(p.channel)}"><span class="rdot"></span>Record this stream</button><small>Anhy Clips watches it and clips the best moments as they happen.</small>`}</div>`);
 }
 function liveOn(c) { return Object.entries(c.profiles || {}).filter(([k, p]) => p.live && c.channels?.[k] === p.channel).sort(([, p]) => p.channel === c.channel ? -1 : 1); }
 function statusBadge(c) {
-  if (c.live_job) return `<span class="sbadge rec"><i></i>Recording</span>`;
+  if (c.live_job) {
+    const state = c.live_state || "connecting";
+    const label = {recording:"Recording", connecting:"Connecting…", finishing:"Finishing clips", error:"Capture failed"}[state] || "Connecting…";
+    const cls = state === "recording" ? "rec" : state === "error" ? "bad" : "";
+    return `<span class="sbadge ${cls}"><i></i>${label}</span>`;
+  }
   const on = liveOn(c);
   if (on.length) { const [k, p] = on[0]; return `<span class="sbadge live"><i></i>Live on ${PLAT[k].name}${p.viewers ? " · " + fmtK(p.viewers) + " watching" : ""}</span>`; }
   if (!Object.keys(c.channels || {}).length) return `<span class="sbadge">No channel yet</span>`;
@@ -1597,10 +1614,10 @@ function moveInd() {
 function drawShell() {  const nav = (v, icon, label, extra = "") => `<button class="nav-item ${S.view === v ? "on" : ""}" data-act="go" data-v="${esc(v)}" title="${esc(label)}">${icon}<span class="label">${esc(label)}</span>${extra}</button>`;
   // one creator: the workspace button, and a small × beside it to remove the creator without opening it. The ×
   // stands out on a creator who is live or recording, since that is when you most want one to hand.
-  const cnav = c => { const on = liveOn(c);
-    return `<div class="nav-row${c.live_job || on.length ? " live" : ""}">${nav("c:" + c.id, cav(c), c.name,
-      c.live_job ? `<span class="sb-tag rec" title="Recording now"><i></i>Rec</span>`
-        : on.length ? `<span class="sb-tag" title="Live on ${esc(on.map(([k]) => PLAT[k].name).join(" and "))}"><i></i>Live</span>` : "")}<button class="nav-x" data-act="delcreator" data-id="${esc(c.id)}" title="Remove ${esc(c.name)}" aria-label="Remove ${esc(c.name)}">${ic("x")}</button></div>`; };
+  const cnav = c => { const on = liveOn(c), state = c.live_state || "connecting";
+    const liveTag = c.live_job ? `<span class="sb-tag ${state === "recording" ? "rec" : ""}" title="${state === "recording" ? "Recording now" : state === "error" ? "Capture failed" : state === "finishing" ? "Finishing clips" : "Connecting to the stream"}"><i></i>${state === "recording" ? "Rec" : state === "error" ? "Failed" : state === "finishing" ? "Finishing" : "Starting"}</span>`
+      : on.length ? `<span class="sb-tag" title="Live on ${esc(on.map(([k]) => PLAT[k].name).join(" and "))}"><i></i>Live</span>` : "";
+    return `<div class="nav-row${c.live_job || on.length ? " live" : ""}">${nav("c:" + c.id, cav(c), c.name, liveTag)}<button class="nav-x" data-act="delcreator" data-id="${esc(c.id)}" title="Remove ${esc(c.name)}" aria-label="Remove ${esc(c.name)}">${ic("x")}</button></div>`; };
   put($("#nav"), nav("overview", navIc("home", "overview"), "Home") +
     nav("library", navIc("film", "library"), "All videos", (() => { const w = S.jobs.filter(j => ["queued", "running"].includes(j.status)).length;
       return w ? `<span class="working" title="${w} working now"><i></i>${w} working</span>` : S.jobs.length ? `<span class="count">${S.jobs.length}</span>` : ""; })()) +
@@ -1616,10 +1633,11 @@ function drawShell() {  const nav = (v, icon, label, extra = "") => `<button cla
       <span class="who">${S.status.accounts === false ? `<b>Settings</b><span>AI key, connected apps</span>` : `<b>${esc(S.status.user.name)}</b><span>${esc(S.status.user.email)}</span>`}</span></button>
       <button class="icon-btn bell" data-act="bell" title="Notifications" aria-label="Notifications${S.status.unread ? `, ${S.status.unread} new` : ""}" aria-haspopup="dialog">${ic("bell")}${S.status.unread ? `<span class="dotn">${S.status.unread > 9 ? "9+" : S.status.unread}</span>` : ""}</button></div>` : ""));
   const c = creator();
-  const recording = S.creators.filter(x => x.live_job).length;
+  const recording = S.creators.filter(x => x.live_state === "recording").length;
+  const connecting = S.creators.filter(x => x.live_state === "connecting").length;
   let title = {overview:"Home", library:"All videos", settings:"Settings", usage:"AI usage"}[S.view] || "", sub = "", act = "";
   if (S.view === "usage") sub = "What the AI has been used for.";
-  if (S.view === "overview") sub = `${greeting()}. ${S.creators.length} creator${S.creators.length === 1 ? "" : "s"}${recording ? `, ${recording} recording now` : ""}.`;
+  if (S.view === "overview") sub = `${greeting()}. ${S.creators.length} creator${S.creators.length === 1 ? "" : "s"}${recording ? `, ${recording} recording now` : ""}${connecting ? `, ${connecting} connecting` : ""}.`;
   if (S.view === "library") sub = "Every video and recording, across all creators.";
   if (S.view === "settings") sub = (S.status.accounts === false ? "Your AI key and connected apps." : "Your profile, security and connected apps.");
   let pic = "", subHtml = null, tabs = "";
@@ -1630,8 +1648,10 @@ function drawShell() {  const nav = (v, icon, label, extra = "") => `<button cla
     const nJobs = S.jobs.filter(j => j.creator === c.id).length, nLog = (c.log || []).length;
     tabs = [["clips", "Clips", "scissors", nJobs], ["setup", "Setup", "cog", 0], ["activity", "Activity", "clock", nLog]].map(([k, l, i, n]) =>
       `<button class="tabbtn ${S.ctab === k ? "on" : ""}" data-act="tab" data-t="${k}" role="tab" aria-selected="${S.ctab === k}">${ic(i)}${l}${n ? `<span class="n">${n > 99 ? "99+" : n}</span>` : ""}</button>`).join("");
-    act = c.live_job ? `<button class="btn danger" data-act="stoplive" data-j="${esc(c.live_job)}">${ic("stop")}Stop recording</button>`
-                     : `<button class="btn primary" data-act="golive"><span class="rdot"></span>${liveOn(c).length ? "Record live stream" : "Start recording"}</button>`;
+    act = c.live_job
+      ? ["finishing", "error"].includes(c.live_state) ? `<button class="btn" disabled>${c.live_state === "error" ? "Capture failed" : "Finishing clips…"}</button>`
+        : `<button class="btn danger" data-act="stoplive" data-j="${esc(c.live_job)}">${ic("stop")}Stop recording</button>`
+      : `<button class="btn primary" data-act="golive"><span class="rdot"></span>${liveOn(c).length ? "Record live stream" : "Start recording"}</button>`;
   }
   if (S.view === "overview" || S.view === "library") {
     const L = S.status.links || {};
@@ -1831,7 +1851,7 @@ function drawAdd(variant) {
   A.edit_style = ed.edit_style;
   A.sound_fx = ed.sound_fx;
   $("#add").innerHTML = `<form class="composer ${variant === "hero" ? "big" : "compact"}" id="addform">
-    <div class="composer-input">${ic("link")}<input id="url" placeholder="Paste a YouTube, Twitch or Kick video link" autocomplete="off" aria-label="Video link"></div>
+    <div class="composer-input">${ic("link")}<input id="url" placeholder="Paste a YouTube, Twitch, Kick or JioHotstar video link" autocomplete="off" aria-label="Video link"></div>
     <label class="composer-guidance" for="o_instructions"><span>Special instructions <small>optional · helps the AI choose moments</small></span>
       <textarea id="o_instructions" rows="2" maxlength="500" placeholder="e.g. Focus on funny reactions; avoid spoilers">${esc(A.instructions || "")}</textarea></label>
     <div class="composer-edit-strip" role="region" aria-label="Clip editing controls">
@@ -1946,8 +1966,8 @@ const isVideoName = n => videoKinds().some(k => k.toLowerCase() === fileEnding(n
 const fmtLen = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0"); return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`; };
 const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.max(1, Math.round(b / 1e6)) + " MB";
 const isChannel = u => /^(https?:\/\/)?(www\.)?(twitch\.tv|kick\.com)\/[A-Za-z0-9_]+\/?$/.test(u) || /youtube\.com\/(@[^/]+|channel\/[^/]+)\/?(live|videos|streams)?\/?$/.test(u);
-const looksLink = u => /^https?:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|twitch\.tv|kick\.com)\//i.test(u);
-const fullLink = u => /[?&]v=[\w-]{11}\b|youtu\.be\/[\w-]{11}\b|\/(shorts|live|embed)\/[\w-]{11}\b|twitch\.tv\/videos\/\d{6,}|clips\.twitch\.tv\/\w|twitch\.tv\/\w+\/clip\/\w|kick\.com\/[\w-]+\/(videos?|clips?)\/[\w-]{6,}/i.test(u);
+const looksLink = u => /^https?:\/\/([\w-]+\.)*(youtube\.com|youtu\.be|twitch\.tv|kick\.com|hotstar\.com|jiohotstar\.com)\//i.test(u);
+const fullLink = u => /[?&]v=[\w-]{11}\b|youtu\.be\/[\w-]{11}\b|\/(shorts|live|embed)\/[\w-]{11}\b|twitch\.tv\/videos\/\d{6,}|clips\.twitch\.tv\/\w|twitch\.tv\/\w+\/clip\/\w|kick\.com\/[\w-]+\/(videos?|clips?)\/[\w-]{6,}|(?:hotstar|jiohotstar)\.com\/[^?#]*\/\d{10}(?:[/?#]|$)/i.test(u);
 const batchMax = () => S.status.max_batch || 5;
 const batchUsed = A => A.files.length + (A.locals || []).length + A.links.filter(l => l.state !== "bad").length;
 const newId = () => Math.random().toString(36).slice(2);
@@ -2052,7 +2072,7 @@ function drawAtt() {
   // a video whose picture could not be drawn keeps the film icon behind it
   box.querySelectorAll("img[data-thumb]").forEach(im => im.addEventListener("error", () => im.remove(), {once: true}));
   $("#att")?.classList.toggle("has", !!h);
-  const u = $("#url"); if (u) u.placeholder = A.links.length || A.files.length || (A.locals || []).length ? "Paste another link" : "Paste a YouTube, Twitch or Kick video link";
+  const u = $("#url"); if (u) u.placeholder = A.links.length || A.files.length || (A.locals || []).length ? "Paste another link" : "Paste a YouTube, Twitch, Kick or JioHotstar video link";
   drawLookBar();
   const b = $("#goBtn");
   if (b) { b.disabled = A.busy;
@@ -2097,13 +2117,14 @@ function onLink(input) {
   const A = att(), u = input.value.trim();
   if (!u) { A.note = null; return drawAtt(); }
   if (isChannel(u)) { A.note = "That's a channel, not a video. To clip their live streams, add them as a creator and press Start recording."; return drawAtt(); }
-  if (!looksLink(u)) { A.note = u.length > 10 ? "Paste a full YouTube, Twitch or Kick video link." : null; return drawAtt(); }
+  if (!looksLink(u)) { A.note = u.length > 10 ? "Paste a full YouTube, Twitch, Kick or JioHotstar video link." : null; return drawAtt(); }
   A.note = null; drawAtt();
   if (fullLink(u)) return takeLink(A, u, input);
   linkTimer = setTimeout(() => { if (input.value.trim() === u) takeLink(A, u, input); }, 900);   // other link shapes: take it once typing stops
 }
 document.addEventListener("input", e => { if (e.target.id === "url") onLink(e.target);
   if (e.target.id === "o_instructions") att().instructions = e.target.value;
+  if (e.target.id === "dlg_watermark_text") syncWatermarkPreview();
   if (e.target.closest?.("#cform") && e.target.dataset.k && !/checkbox|radio/.test(e.target.type)) dirty(true); });
 document.addEventListener("keydown", e => { if (e.target.id === "url" && e.key === "Enter" && e.target.value.trim() && looksLink(e.target.value.trim())) { e.preventDefault(); clearTimeout(linkTimer); takeLink(att(), e.target.value.trim(), e.target); } });
 document.addEventListener("click", e => {
@@ -2183,7 +2204,8 @@ const LOOK_LAYOUTS = {blur: "Full frame + blurred fill", zoom: "Zoomed in + blur
                       gameplay: "Gameplay fills the screen, facecam in the corner",
                       split: "Streamer on top, gameplay on bottom (half and half)"};
 const LAYOUT_WHY = {blur: "The whole picture, with a blurred copy filling the rest.", zoom: "The picture larger, the edges blurred away.",
-                    crop: "The picture fills the screen; the sides are cut off.", gameplay: "The game fills the screen, the webcam sits in the corner.",
+                    crop: "The picture fills the screen; the sides are cut off.",
+                    gameplay: "The game fills the screen, with the detected webcam in the corner.",
                     split: "The detected streamer fills the top half and gameplay fills the bottom half. If no webcam is found, the clip uses full-screen gameplay."};
 
 /* What the chooser starts on: the creator's own settings, then whatever was chosen for this creator last time
@@ -2373,7 +2395,7 @@ function drawPick(opts, A) {
     <div class="pd-look"><span class="pd-shot"><canvas id="p_canvas" width="270" height="480"></canvas>${src ? "" : `<span class="noimg">${ic("film")}Add a video and the preview appears here</span>`}</span>
       <div><h3 style="margin:0 0 4px">What it will look like</h3><p class="pd-sub" style="margin:0">${esc(LAYOUT_WHY[opts.layout] || "")} The big text is the hook; the caption is a line of what is said.</p>
         <p class="pd-sub" style="margin:8px 0 0"><b id="p_now">${esc(LAYOUT_SHORT[opts.layout] || opts.layout)}</b> · ${esc(S.status?.styles?.[opts.style] || LOOK_STYLES[opts.style] || opts.style)}${opts.captions === false ? " · no captions" : ""}</p>
-        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${["gameplay", "split"].includes(opts.layout) ? "" : "none"}">${opts.layout === "split" ? "A detected webcam fills the top half; gameplay fills the bottom. Without a webcam, the clip uses full-screen gameplay." : "Gameplay + facecam protects the corner webcam PIP during punch-ins automatically."}</p></div></div>
+        <p class="pd-sub" id="p_warn" style="margin:6px 0 0;color:var(--text);display:${["gameplay", "split"].includes(opts.layout) ? "" : "none"}">${opts.layout === "split" ? "Preview is approximate; Anhy detects the webcam on the actual video. Without a webcam, the clip uses full-screen gameplay." : "Preview is approximate; Anhy detects the webcam on the actual video and protects it during punch-ins."}</p></div></div>
     <div><h3>How many clips</h3><div class="nsteps" style="grid-template-columns:1fr">
       ${stepper("p_max", "Clips per video", opts.max_clips, 1, 20, 1, "")}</div></div>
     <div class="pd-foot"><span class="hint">Change any of this later on each clip.</span><span class="grow"></span>
@@ -2438,8 +2460,8 @@ document.addEventListener("click", e => {
       const needsFacecam = ["gameplay", "split"].includes(lay.dataset.layout);
       warn.style.display = needsFacecam ? "" : "none";
       warn.textContent = lay.dataset.layout === "split"
-        ? "A detected webcam fills the top half; gameplay fills the bottom. Without a webcam, the clip uses full-screen gameplay."
-        : "Gameplay + facecam protects the corner webcam PIP during punch-ins automatically.";
+        ? "Preview is approximate; Anhy detects the webcam on the actual video. Without a webcam, the clip uses full-screen gameplay."
+        : "Preview is approximate; Anhy detects the webcam on the actual video and protects it during punch-ins.";
     }
     return drawLook();
   }
@@ -2630,7 +2652,7 @@ async function makeClips() {
     return;
   }
   if (!canGo(A)) {
-    toast(A.note || "Paste a YouTube, Twitch or Kick video link, or add a video file first.", "bad");
+    toast(A.note || "Paste a YouTube, Twitch, Kick or JioHotstar video link, or add a video file first.", "bad");
     $("#url")?.focus();
     return;
   }
@@ -2720,14 +2742,20 @@ function everyPick(cid, v) {
     <div class="pick-menu" role="listbox">${EVERY.map(([k, l, h]) => `<button type="button" class="pick-opt" role="option" data-v="${k}" aria-selected="${k === cur[0]}"><span class="pl">${l}</span>${h ? `<small class="ph">${h}</small>` : ""}${ic("check").replace("<svg", '<svg class="tick"')}</button>`).join("")}</div></div>`;
 }
 function liveHtml(j) {
-  const L = j.live || {elapsed:0, lines:[], level:[], chat:null, checks:0, buffer_sec:0, pending_clips:0};
+  const L = j.live || {state:"connecting", elapsed:0, lines:[], level:[], chat:null, checks:0, buffer_sec:0, pending_clips:0};
+  const state = L.state || (L.elapsed > 0 && L.buffer_sec > 0 ? "recording" : "connecting");
+  const capturing = state === "recording", canClip = capturing && L.elapsed >= 5;
+  const stateLabel = {recording:"Recording", connecting:"Connecting", finishing:"Finishing", error:"Capture failed"}[state] || "Connecting";
+  const stateClass = capturing ? "live" : state === "error" ? "bad" : "warn";
+  const waiting = capturing ? "" : `<p class="sub">${state === "error" ? "Capture stopped before video was ready." : L.elapsed > 0 ? "Audio is arriving; waiting for a video segment before clips can be made." : "Waiting for the stream's first audio and video."}</p>`;
+  const clipDisabled = canClip ? "" : "disabled";
   return `<div class="livecard">
-    <div class="lc-head"><div class="lc-title"><span class="pill live"><span class="dot"></span>Live</span>
+    <div class="lc-head"><div class="lc-title"><span class="pill ${stateClass}"><span class="dot"></span>${stateLabel}</span>
         <h3>${esc(j.title || j.source.name)}</h3><p class="sub">${esc(j.uploader)}${j.uploader ? " · " : ""}${esc(j.stage)}</p></div>
-      <div class="lc-acts"><button class="btn primary" data-act="clipnow" data-j="${j.id}" data-s="30">${ic("scissors")}Clip last 30s</button>
-        <button class="btn" data-act="clipnow" data-j="${j.id}" data-s="60">Last 60s</button>
-        <button class="btn danger" data-act="stoplive" data-j="${j.id}">${ic("stop")}Stop</button></div></div>
-    <div class="stats"><div class="stat"><b>${fmt(L.elapsed)}</b><span>Recorded</span></div><div class="stat"><b>${Math.round(L.buffer_sec / 60)} min</b><span>Kept in buffer</span></div>
+      <div class="lc-acts"><button class="btn primary" data-act="clipnow" data-j="${j.id}" data-s="30" ${clipDisabled}>${ic("scissors")}Clip last 30s</button>
+        <button class="btn" data-act="clipnow" data-j="${j.id}" data-s="60" ${clipDisabled}>Last 60s</button>
+        <button class="btn danger" data-act="stoplive" data-j="${j.id}" ${["error", "finishing"].includes(state) ? "disabled" : ""}>${["error", "finishing"].includes(state) ? "Capture stopped" : `${ic("stop")}Stop`}</button></div></div>${waiting}
+    <div class="stats"><div class="stat"><b>${fmt(L.elapsed)}</b><span>${capturing ? "Recorded" : L.elapsed > 0 ? "Audio so far" : "Waiting for capture"}</span></div><div class="stat"><b>${Math.round(L.buffer_sec / 60)} min</b><span>Kept in buffer</span></div>
       <div class="stat">${everyPick(j.creator, L.every_min ?? 3)}<span>${L.every_min === 0 ? (L.auto?.warming ? "AI checks: learning the stream" : L.auto?.waiting ? "AI checks: jump spotted, checking soon" : `AI checks on jumps · ${L.auto?.spikes || 0} so far`) : "AI checks every"}</span></div>
       <div class="stat"><b>${L.checks}</b><span>AI calls${L.skipped ? ` · ${L.skipped} skipped` : ""}${L.rejected ? ` · ${L.rejected} turned down` : ""}</span></div><div class="stat"><b>${j.clips.length}</b><span>Clips so far</span></div>
       ${L.pending_clips ? `<div class="stat"><b>${L.pending_clips}</b><span>Hand clip being prepared</span></div>` : ""}</div>
@@ -2736,7 +2764,7 @@ function liveHtml(j) {
       ${L.chat ? `<div class="meter"><h4>Chat messages per second</h4>${spark(L.chat, "chat", 0, Math.max(4, ...L.chat))}</div>` : ""}
       <div class="meter"><h4>Latest AI decisions</h4><div class="said" style="justify-content:flex-start;color:var(--text)">${(L.verdicts || []).length ? L.verdicts.slice(0, 4).map(v => `<div>${fmt(v.t)} · ${v.transcript != null ? "words " + v.transcript : ""}${v.reaction != null ? " · reaction " + v.reaction : ""} · <span class="sub">${esc(v.result)}</span></div>`).join("") : "<div class='sub'>First check soon…</div>"}</div></div>
       <div class="meter"><h4>What was just said</h4><div class="said">${L.lines.length ? L.lines.map(t => `<div>${esc(t)}</div>`).join("") : "<div>Listening…</div>"}</div></div>
-    </div>${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}</div>
+    </div>${L.transcribe_error ? `<div class="err">Speech transcription failed, so automatic clips are paused. Live video is still being saved; manual clips remain available. ${esc(L.transcribe_error)}</div>` : ""}${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}</div>
     ${j.clips.length ? `<div class="grid" style="margin-bottom:28px">${[...j.clips].reverse().map(c => clipHtml(j, c)).join("")}</div>` : ""}`;
 }
 function jobHtml(j) {
@@ -2876,6 +2904,9 @@ function drawCreatorForm() {
         <label class="f">Layout<select data-k="layout">${opts(S.status.layouts, c.layout)}</select></label>
         <label class="f">Default editing style<select data-k="edit_style">${opts({off:"Off — raw cut", balanced:"Balanced — studio voice & clean punch-ins", pro:"Pro — jump-cuts, multi-cam, climax hits & film grade", energetic:"Energetic — tightest pacing, 1.38x snap zooms & full SFX"}, normEditStyle(c))}</select><small class="sub" style="font-weight:400">Used for automatic live clips and as the default when uploading for this creator.</small></label>
         <label class="sw" style="align-self:end;padding-bottom:6px"><input type="checkbox" data-k="sound_fx" ${c.sound_fx === false ? "" : "checked"}>Subtle sound accents on peaks</label>
+        <label class="sw span"><input type="checkbox" data-k="watermark_enabled" ${c.watermark_enabled ? "checked" : ""}><span>Show a channel banner on every clip<small>A sticker-style @ banner is burned into new and live clips. You can change it on an individual clip before re-making it.</small></span></label>
+        <label class="f">Banner text<input data-k="watermark_text" maxlength="48" value="${esc(c.watermark_text || c.profile?.name || c.name)}" placeholder="Channel name or @handle"></label>
+        <label class="f">Banner position<select data-k="watermark_position">${opts({"top-left":"Top left", "top-right":"Top right", "bottom-left":"Bottom left", "bottom-right":"Bottom right"}, c.watermark_position || "top-left")}</select></label>
         <label class="f">Game<input data-k="game" value="${esc(c.game || "")}" placeholder="Read from the title"><small class="sub" style="font-weight:400">Left empty, the game is read from the stream's title. Set it for a streamer whose title says nothing: GTA 6, Fortnite, Elden Ring.</small></label>
         <label class="f">Shortest clip (seconds)<input data-k="min_len" type="number" value="${c.min_len}"></label>
         <label class="f">Longest clip (seconds)<input data-k="max_len" type="number" value="${c.max_len}"></label>
@@ -3180,14 +3211,33 @@ async function drawSettings() {
 async function saveSettings() { const d = {}; $$("#sform [data-s]").forEach(i => d[i.dataset.s] = i.value); await send("/api/settings", d, "PUT"); }
 
 /* ============================================================ clip editor */
+function syncWatermarkPreview() {
+  const preview = $("#dlg_watermark_preview");
+  if (!preview) return;
+  const text = $("#dlg_watermark_text")?.value.trim() || "";
+  const position = $("#dlg_watermark_position")?.value || "top-left";
+  const safePosition = ["top-left", "top-right", "bottom-left", "bottom-right"].includes(position) ? position : "top-left";
+  preview.className = `channel-sticker-preview wm-${safePosition}`;
+  preview.hidden = !$("#dlg_watermark_enabled")?.checked || !text;
+  const label = preview.querySelector("b");
+  if (label) label.textContent = text;
+}
 function openClip(jid, cid) { D.jid = jid; D.cid = cid; D.sig = ""; drawClipDlg(true); $("#clipdlg").showModal(); }
 function drawClipDlg(full) {
   const j = jobOf(D.jid), c = j?.clips.find(x => x.id === D.cid), dlg = $("#clipdlg");
   if (!c) { if (dlg.open) dlg.close(); return; }
   const m = `/media/${j.id}/`, sig = c.status + c.version;
-  const stage = c.status === "done" ? `<video src="${m}${esc(c.file)}?v=${c.version}" poster="${m}${esc(c.cover)}?v=${c.version}" controls autoplay playsinline></video>`
+  const channel = S.creators.find(x => x.id === j.creator);
+  const watermarkText = typeof c.watermark_text === "string" ? c.watermark_text
+    : channel?.watermark_text || channel?.profile?.name || channel?.name || "";
+  const watermarkPosition = ["top-left", "top-right", "bottom-left", "bottom-right"].includes(c.watermark_position)
+    ? c.watermark_position : channel?.watermark_position || "top-left";
+  const watermarkEnabled = typeof c.watermark_enabled === "boolean" ? c.watermark_enabled : !!channel?.watermark_enabled;
+  const videoStage = c.status === "done" ? `<video src="${m}${esc(c.file)}?v=${c.version}" poster="${m}${esc(c.cover)}?v=${c.version}" controls autoplay playsinline></video>`
     : c.status === "error" ? `<div class="err" style="padding:20px;text-align:center">${esc(c.error || "Could not make this clip.")}</div>`
     : `<span class="making">${c.status === "rendering" ? "Making this clip…" : "Waiting its turn…"}</span>`;
+  const stage = videoStage + (c.status === "done" ? `<div id="dlg_watermark_preview" class="channel-sticker-preview wm-${esc(watermarkPosition)}" ${watermarkEnabled && watermarkText ? "" : "hidden"}>
+    <span class="mark">@</span><span class="copy"><small>CHANNEL</small><b>${esc(watermarkText)}</b></span></div>` : "");
   if (full) {
     const edStyle = normEditStyle(c);
     dlg.innerHTML = `<div class="editor"><div class="stage" id="stage">${stage}</div>
@@ -3208,10 +3258,16 @@ function drawClipDlg(full) {
           <div id="dlg_edit_summary">${editSummaryHtml(c, false)}</div>
         </div>
         <h3>On the video</h3>
+        ${c.layout_fallback ? `<p class="help" role="status">${esc(c.layout_fallback)} Requested: ${esc(LAYOUT_SHORT[c.layout_requested] || c.layout_requested || c.layout)}.</p>` : ""}
         <label class="f">Big text<input data-f="hook" value="${esc(c.hook)}"></label>
         <label class="sw"><input type="checkbox" data-f="captions" data-caption-toggle ${c.captions === false ? "" : "checked"}>Generate captions</label>
         <div class="two"><label class="f">Caption style<select data-f="style" data-caption-style ${c.captions === false ? "disabled" : ""}>${opts(S.status.styles, c.style)}</select></label>
           <label class="f">Layout<select data-f="layout">${opts(S.status.layouts, c.layout)}</select></label></div>
+        <h3>Channel banner</h3>
+        <p class="help">Add a sticker-style @ banner over the clip to make the channel easy to spot.</p>
+        <label class="sw" style="margin:0"><input id="dlg_watermark_enabled" type="checkbox" data-f="watermark_enabled" data-watermark-preview ${watermarkEnabled ? "checked" : ""}>Show banner on this clip</label>
+        <div class="two"><label class="f">Banner text<input id="dlg_watermark_text" data-f="watermark_text" data-watermark-preview maxlength="48" value="${esc(watermarkText)}" placeholder="Channel name or @handle"></label>
+          <label class="f">Position<select id="dlg_watermark_position" data-f="watermark_position" data-watermark-preview>${opts({"top-left":"Top left", "top-right":"Top right", "bottom-left":"Bottom left", "bottom-right":"Bottom right"}, watermarkPosition)}</select></label></div>
         <div class="two"><label class="f">Start (seconds)<input data-f="start" type="number" step="0.5" value="${c.start}"></label>
           <label class="f">End (seconds)<input data-f="end" type="number" step="0.5" value="${c.end}"></label></div>
         <h3>Post text</h3>
@@ -3241,6 +3297,7 @@ function drawClipDlg(full) {
     if (sb) sb.innerHTML = editSummaryHtml(c, false);
   }
   D.sig = sig;
+  syncWatermarkPreview();
   attachIgTagSuggest($("#dlg_ig_tags"));
   put($("#dposts"), postPills(c));
 }
@@ -3306,6 +3363,7 @@ function syncCaptionStyle(toggle) {
 }
 document.addEventListener("change", async e => {
   const t = e.target;
+  if (t.hasAttribute("data-watermark-preview")) syncWatermarkPreview();
   if (t.id === "o_creator") { drawLookBar(); return; }     // the composer shows that creator's own look
   if (t.hasAttribute("data-caption-toggle")) {
     if (t.id === "o_captions") t.dataset.overridden = "true";
@@ -3488,9 +3546,9 @@ document.addEventListener("click", async e => {
         // creator meanwhile. The recording must stay with the one whose button was pressed.
         const cid0 = creatorId();
         const j = await send(`/api/creators/${cid0}/live`, d.url ? {channel: d.url} : {});
-        if (j?.id) { const c = S.creators.find(x => x.id === cid0); if (c) c.live_job = j.id; if (!jobOf(j.id)) S.jobs.unshift(j); render(); }
+        if (j?.id) { const c = S.creators.find(x => x.id === cid0); if (c) { c.live_job = j.id; c.live_state = "connecting"; } if (!jobOf(j.id)) S.jobs.unshift(j); render(); }
         const still = creatorId() === cid0;
-        toast(still ? "Recording started. Clips appear below as they're made." : `Recording started for ${S.creators.find(x => x.id === cid0)?.name || "that creator"}.`, "ok");
+        toast(still ? "Connecting to the stream. Recording starts after audio and video reach the buffer." : `Connecting to the stream for ${S.creators.find(x => x.id === cid0)?.name || "that creator"}.`, "ok");
         if (still) setTab("clips");
       } catch (e) { b.disabled = false; b.innerHTML = was; throw e; }
       return tick();

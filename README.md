@@ -5,10 +5,14 @@ Based on [PeakCut](https://github.com/haziqahmedqasmi/peakcut) by PeakCut contri
 Turn long videos and live streams into captioned vertical clips, ready to post. Free and open source: run it on
 your own computer or server, with your own AI key.
 
-Paste a YouTube, Twitch or Kick link, upload a file, or point it at a video that is already in a folder on your
-computer. Choose how the clips should look, and Anhy Clips finds the moments worth clipping, cuts them to 9:16, adds
-word-by-word captions and a hook, and can post them to your connected accounts. It can also record a creator's live
-stream and clip the highlights while the stream is still running.
+Paste a YouTube, Twitch, Kick or JioHotstar video link, upload a file, or point it at a video that is already in a
+folder on your computer. Choose how the clips should look, and Anhy Clips finds the moments worth clipping, cuts them
+to 9:16, adds word-by-word captions and a hook, and can post them to your connected accounts. It can also record a
+creator's YouTube, Twitch or Kick live stream and clip the highlights while the stream is still running.
+
+JioHotstar links use yt-dlp's Hotstar extractor. Some titles require an authorized account: set
+`ANHY_HOTSTAR_COOKIES_FILE` to a private Netscape-format `cookies.txt` file if needed. DRM-protected or region
+restricted titles cannot be downloaded from a link; Anhy Clips does not bypass those restrictions.
 
 ## What it does
 
@@ -21,6 +25,7 @@ stream and clip the highlights while the stream is still running.
 - **Live clipping.** Records a stream into a rolling buffer and clips as it happens, using loudness, chat activity
   and the transcript.
 - **Workspaces per creator.** Channels, clip settings, posting rules and an activity log for each creator you clip.
+- **Channel banner watermark.** Add a sticker-style @ banner to a creator's new and live clips, choose a corner, and adjust each clip's text or placement before re-making it.
 - **Posting.** Connect YouTube, Instagram and TikTok in one click, or Buffer with an API key to reach every channel
   in your Buffer at once, then queue or auto-post finished clips, with spacing and daily caps (see
   [DEPLOY.md](DEPLOY.md#connecting-youtube-instagram-tiktok-and-buffer) for the one-time setup).

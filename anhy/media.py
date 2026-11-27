@@ -27,7 +27,8 @@ YT_PAUSE = 600
 _yt_refused_until = 0.0
 _YT_AGAIN = "YouTube links will be tried again in a few minutes."
 YT_BLOCKED = ("YouTube isn't letting Anhy Clips download videos right now. Upload the video file instead, pick a video "
-              "that is already in a folder on this computer (From a folder), or use a Twitch or Kick link. " + _YT_AGAIN)
+              "that is already in a folder on this computer (From a folder), or try a public JioHotstar, Twitch or Kick "
+              "video link. " + _YT_AGAIN)
 # the same thing said to someone who wanted to record a stream: there is no file to pick for a stream that never ran
 YT_BLOCKED_LIVE = ("YouTube isn't letting Anhy Clips record YouTube streams right now. Twitch and Kick streams still "
                    "work. " + _YT_AGAIN)
@@ -38,10 +39,62 @@ class YouTubeBlocked(RuntimeError):
     pass
 
 
+HOTSTAR_AUTH_HELP = ("This JioHotstar video requires an authorized account. Set ANHY_HOTSTAR_COOKIES_FILE to a private, "
+                     "Netscape-format cookies.txt file for an account that can watch it. DRM-protected videos cannot "
+                     "be clipped from a link.")
+HOTSTAR_DRM_HELP = ("JioHotstar did not provide a downloadable video. It may be DRM-protected or unavailable in this "
+                    "region; Anhy Clips cannot bypass those restrictions. Try a video file you are allowed to use.")
+_HOTSTAR_AUTH_ERROR = re.compile(r"registered users|cookies|login required|log in|authentication|subscription|user token", re.I)
+_HOTSTAR_DRM_ERROR = re.compile(r"drm|widevine|encrypted|protected|geo.?restricted|not available in your region", re.I)
+
+
 def is_youtube(url: str) -> bool:
     from urllib.parse import urlparse
     host = (urlparse((url or "").strip()).hostname or "").lower()
     return host in ("youtube.com", "youtu.be") or host.endswith((".youtube.com", ".youtu.be"))
+
+
+def is_hotstar(url: str) -> bool:
+    from urllib.parse import urlparse
+    host = (urlparse((url or "").strip()).hostname or "").lower()
+    return any(host == root or host.endswith("." + root) for root in ("hotstar.com", "jiohotstar.com"))
+
+
+def _extractor_url(url: str) -> str:
+    """yt-dlp's JioHotstar extractor uses hotstar.com; map the new public host without changing the video path."""
+    from urllib.parse import urlsplit, urlunsplit
+    try:
+        parts = urlsplit(url.strip())
+        host = (parts.hostname or "").lower()
+        if host == "jiohotstar.com" or host.endswith(".jiohotstar.com"):
+            return urlunsplit((parts.scheme, "www.hotstar.com", parts.path, parts.query, ""))
+    except ValueError:
+        pass
+    return url
+
+
+def _site_options(url: str, opts: dict) -> dict:
+    """Pass a user's private Hotstar cookie file only to Hotstar extraction requests."""
+    out = dict(opts)
+    if is_hotstar(url) and config.HOTSTAR_COOKIES_FILE:
+        path = Path(config.HOTSTAR_COOKIES_FILE).expanduser()
+        if not path.is_file():
+            raise ValueError("The configured JioHotstar cookies file could not be found. Check ANHY_HOTSTAR_COOKIES_FILE.")
+        out["cookiefile"] = str(path)
+    return out
+
+
+def _hotstar_error_message(url: str, error) -> str:
+    if not is_hotstar(url):
+        return ""
+    detail = str(error)
+    if "configured jiohotstar cookies file could not be found" in detail.lower():
+        return "The configured JioHotstar cookies file was not found. Check ANHY_HOTSTAR_COOKIES_FILE."
+    if _HOTSTAR_DRM_ERROR.search(detail):
+        return HOTSTAR_DRM_HELP
+    if _HOTSTAR_AUTH_ERROR.search(detail):
+        return HOTSTAR_AUTH_HELP
+    return ""
 
 
 def youtube_paused() -> bool:
@@ -127,8 +180,14 @@ def _biggest(job_dir: Path, stem: str) -> Path:
 
 def info(url: str) -> dict:
     """Title, channel and length, without downloading anything."""
-    with _youtube_guard(url), _ydl({}) as ydl:
-        i = ydl.extract_info(url, download=False)
+    try:
+        with _youtube_guard(url), _ydl(_site_options(url, {})) as ydl:
+            i = ydl.extract_info(_extractor_url(url), download=False)
+    except Exception as e:  # noqa: BLE001 - give Hotstar login and DRM refusals a useful explanation
+        message = _hotstar_error_message(url, e)
+        if message:
+            raise ValueError(message) from None
+        raise
     return {"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "",
             "duration": float(i.get("duration") or 0), "is_live": bool(i.get("is_live")),
             "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}
@@ -259,17 +318,31 @@ def download_audio(url: str, job_dir: Path, on_progress=None) -> Path:
         if on_progress and d.get("status") == "downloading" and total:
             on_progress(d.get("downloaded_bytes", 0) / total)
 
-    with _youtube_guard(url), _ydl({"format": "ba[ext=m4a]/ba/worst", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
-               "progress_hooks": [hook]}) as ydl:
-        ydl.download([url])
+    opts = {"format": "ba[ext=m4a]/ba/worst", "outtmpl": str(job_dir / "audio_src.%(ext)s"),
+            "progress_hooks": [hook]}
+    try:
+        with _youtube_guard(url), _ydl(_site_options(url, opts)) as ydl:
+            ydl.download([_extractor_url(url)])
+    except Exception as e:  # noqa: BLE001
+        message = _hotstar_error_message(url, e)
+        if message:
+            raise ValueError(message) from None
+        raise
     return _biggest(job_dir, "audio_src")
 
 
 def download(url: str, job_dir: Path, height=720) -> Path:
     """The whole video. Used for shorter videos, where this is quicker than fetching pieces."""
-    with _youtube_guard(url), _ydl({"format": _video_format(height), "merge_output_format": "mp4",
-                                    "outtmpl": str(job_dir / "source.%(ext)s")}) as ydl:
-        ydl.download([url])
+    opts = {"format": _video_format(height), "merge_output_format": "mp4",
+            "outtmpl": str(job_dir / "source.%(ext)s")}
+    try:
+        with _youtube_guard(url), _ydl(_site_options(url, opts)) as ydl:
+            ydl.download([_extractor_url(url)])
+    except Exception as e:  # noqa: BLE001
+        message = _hotstar_error_message(url, e)
+        if message:
+            raise ValueError(message) from None
+        raise
     return _biggest(job_dir, "source")
 
 
@@ -282,8 +355,14 @@ def download_section(url: str, out_dir: Path, stem: str, start: float, end: floa
             "download_ranges": download_range_func(None, [(max(0.0, start), end)])}
     if exact:
         opts["force_keyframes_at_cuts"] = True
-    with _youtube_guard(url), _ydl(opts) as ydl:
-        ydl.download([url])
+    try:
+        with _youtube_guard(url), _ydl(_site_options(url, opts)) as ydl:
+            ydl.download([_extractor_url(url)])
+    except Exception as e:  # noqa: BLE001
+        message = _hotstar_error_message(url, e)
+        if message:
+            raise ValueError(message) from None
+        raise
     return _biggest(out_dir, stem)
 
 

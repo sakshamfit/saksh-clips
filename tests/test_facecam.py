@@ -5,6 +5,8 @@ border that stays in the same place in every frame.
 
 Runs against the code directly, with its own empty data folder."""
 import os, shutil, subprocess, sys, tempfile
+from pathlib import Path
+from unittest.mock import patch
 os.environ["ANHY_DATA"] = tempfile.mkdtemp(prefix="pc-facecam-")
 sys.path.insert(0, ".")
 from anhy import facecam, render
@@ -42,6 +44,7 @@ try:
     check("its size is right", abs((box or {}).get("w", 0) - 300) <= 1, True)
     check("its height is right", abs((box or {}).get("h", 0) - 170) <= 1, True)
     check("it is sure of it", (box or {}).get("conf"), "high")
+    detected_cam_box = [box[k] for k in ("x", "y", "w", "h")]
 
     # ---- the same box in another corner
     cam_br = make("cam_br.mp4", "color=c=0xC08050:size=300x170:rate=25", where="980:500")
@@ -123,6 +126,7 @@ try:
     check("split fills a vertical clip and places the hook over gameplay",
           render.geometry(1280, 720, "split"), ("split", 1920, 1075, 1670))
     check("portrait sources can keep the split framing", render.geometry(720, 1280, "split")[0], "split")
+    check("portrait gameplay can still keep its webcam overlay", render.geometry(720, 1280, "gameplay")[0], "gameplay")
     check("the streamer crop fills the upper half", "crop=250:180:980:35" in split and "scale=1080:960" in split, True)
     check("the two equal panels are stacked", "vstack=inputs=2" in split and f"y={render.SPLIT_H - 2}" in split, True)
     check("without a webcam the split layout safely fills the screen",
@@ -132,6 +136,54 @@ try:
                                   "-map", "[v1]", "-frames:v", "3", "-f", "null", "-"],
                                  capture_output=True, text=True)
     check("the split filter graph renders without an FFmpeg error", graph_check.returncode, 0)
+
+    def sample_filter(src, graph, x, y):
+        shot = subprocess.run(["ffmpeg", "-v", "error", "-ss", "1", "-i", src,
+                               "-filter_complex", graph, "-map", "[v1]", "-frames:v", "1",
+                               "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True)
+        if shot.returncode or len(shot.stdout) != render.W * render.H * 3:
+            return None
+        i = (y * render.W + x) * 3
+        return tuple(shot.stdout[i:i + 3])
+
+    # Real exported frames, not just a filter string: the top panel is the detected orange camera;
+    # the lower panel and gameplay background remain the changing game.
+    split_visual = render._filter("split", render.H, detected_cam_box, src_w=1280, src_h=720)
+    streamer_px = sample_filter(cam, split_visual, render.W // 2, render.H // 4)
+    game_px = sample_filter(cam, split_visual, render.W // 2, render.H * 3 // 4)
+    check("exported split frames put the streamer above gameplay",
+          streamer_px is not None and game_px is not None
+          and streamer_px[0] > streamer_px[2] + 60 and game_px[1] > game_px[0] + 20, True)
+
+    gameplay_visual = render._filter("gameplay", render.H, detected_cam_box, src_w=1280, src_h=720)
+    pip_h = max(2, int(round(render.PIP_W * detected_cam_box[3] / detected_cam_box[2] / 2)) * 2)
+    pip_x = render.W - (render.PIP_W + 2 * render.PIP_BORDER) - render.PIP_MARGIN
+    pip_px = sample_filter(cam, gameplay_visual,
+                           pip_x + render.PIP_BORDER + render.PIP_W // 2,
+                           render.PIP_MARGIN + render.PIP_BORDER + pip_h // 2)
+    check("exported gameplay frames keep the detected camera in the top-right PIP",
+          pip_px is not None and pip_px[0] > pip_px[2] + 60, True)
+
+    # The clip entry point preserves the chosen split when a camera is known, and makes its
+    # documented full-screen fallback explicit when it is not.
+    empty_plan = {"style": "off", "sound_fx": False, "sound_active": False, "beats": [],
+                  "jump_cuts": {"segments": [(0.0, 4.0)]}, "effective_dur": 4.0, "summary": {}}
+    def render_stub(work_dir, src, out_dir, name, start, end, layout, fg_h, ass, **kwargs):
+        return {"file": f"{name}.mp4", "cover": f"{name}.jpg", "layout": layout}
+    with patch.object(render.config, "TMP_DIR", Path(work)), \
+            patch.object(render, "plan_edits", return_value=empty_plan), \
+            patch.object(render, "_render_in", side_effect=render_stub):
+        split_result = render.render_clip(Path(cam), Path(work), "split-confirm", {
+            "start": 0.0, "end": 4.0, "layout": "split", "facecam": detected_cam_box,
+            "edit_style": "off", "captions": False}, [], 1280, 720)
+        fallback_result = render.render_clip(Path(cam), Path(work), "split-fallback", {
+            "start": 0.0, "end": 4.0, "layout": "split", "edit_style": "off", "captions": False}, [], 1280, 720)
+    check("export keeps the requested split when a valid facecam is passed",
+          (split_result["layout"], split_result["layout_requested"], split_result["layout_fallback"]),
+          ("split", "split", ""))
+    check("export explains when split must fall back because no webcam was found",
+          (fallback_result["layout"], fallback_result["layout_requested"], "No webcam" in fallback_result["layout_fallback"]),
+          ("crop", "split", True))
 
     # the heading must not run under the webcam picture
     pip_h = 380 * 376 / 363

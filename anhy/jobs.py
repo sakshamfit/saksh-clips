@@ -11,7 +11,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from . import brain, config, creators, ctx, facecam, games, load, media, quality, render, roman, safe, transcribe, usage
+from . import brain, branding, config, creators, ctx, facecam, games, load, media, quality, render, roman, safe, transcribe, usage
 
 class _FairQueue:
     """Whose video is next. Each person has their own line and the lines take turns, so someone who adds ten
@@ -109,7 +109,8 @@ on_clip_ready: list = []   # callbacks (job, clip), run once when a clip first f
 
 DEFAULTS = {"max_clips": 6, "min_len": 15, "max_len": 60, "style": "bounce", "layout": "blur", "quality": 720,
             "range_start": None, "range_end": None, "captions": True, "instructions": "",
-            "edit_style": "pro", "auto_edit": True, "sound_fx": True}
+            "edit_style": "pro", "auto_edit": True, "sound_fx": True,
+            "watermark_enabled": False, "watermark_text": "", "watermark_position": branding.DEFAULT_WATERMARK_POSITION}
 
 
 LIMITS = {"max_clips": (1, 20), "min_len": (5, 120), "max_len": (10, 180), "quality": (360, 1080)}
@@ -119,10 +120,16 @@ def clean_options(options) -> dict:
     """Only known settings, each inside its allowed range. Raises ValueError on nonsense."""
     out = {}
     for k, v in (options if isinstance(options, dict) else {}).items():
-        if k in ("captions", "auto_edit", "sound_fx"):
+        if k in ("captions", "auto_edit", "sound_fx", "watermark_enabled"):
             if not isinstance(v, bool):
                 raise ValueError(f"{k.replace('_', ' ').capitalize()} must be on or off.")
             out[k] = v
+            continue
+        if k == "watermark_text":
+            out[k] = branding.clean_watermark_text(v)
+            continue
+        if k == "watermark_position":
+            out[k] = branding.clean_watermark_position(v)
             continue
         if k == "edit_style":
             if not isinstance(v, str) or v.strip().lower() not in render.EDIT_STYLES:
@@ -134,7 +141,7 @@ def clean_options(options) -> dict:
                 raise ValueError("Special instructions must be text under 500 characters.")
             out[k] = " ".join(v.split())
             continue
-        if k not in DEFAULTS or v in ("", None):
+        if k not in DEFAULTS or v is None or (v == "" and k != "watermark_text"):
             continue
         if k in LIMITS:
             lo, hi = LIMITS[k]
@@ -304,7 +311,9 @@ def create(source: dict, options: dict, enqueue=True, creator=None, kind="video"
     if c:
         d = creators.root(c["id"]) / ("live" if kind == "live" else "videos") / jid
         base = {**DEFAULTS, **{k: c[k] for k in ("max_clips", "min_len", "max_len", "style", "layout", "captions",
-                                                 "edit_style", "auto_edit", "sound_fx") if k in c}}
+                                                 "edit_style", "auto_edit", "sound_fx", "watermark_enabled",
+                                                 "watermark_text", "watermark_position") if k in c}}
+        base["watermark_text"] = base.get("watermark_text") or (c.get("profile") or {}).get("name") or c.get("name", "")
     else:
         d, base, creator = config.user_dir(ctx.uid()) / "jobs" / jid, dict(DEFAULTS), None
     opts = {**base, **clean_options(options)}
@@ -365,7 +374,8 @@ def request_render(jid, cid, changes: dict):
     clip = next(c for c in job["clips"] if c["id"] == cid)
     new = dict(clip)
     # Handle edit_style and legacy auto_edit/sound_fx/captions cleanly together.
-    edit_patch = {k: changes[k] for k in ("captions", "edit_style", "auto_edit", "sound_fx") if k in changes}
+    edit_patch = {k: changes[k] for k in ("captions", "edit_style", "auto_edit", "sound_fx", "watermark_enabled",
+                                              "watermark_text", "watermark_position") if k in changes}
     if edit_patch:
         new.update(clean_options(edit_patch))
     for k in ("start", "end"):
@@ -809,7 +819,11 @@ def _run_job(job):
             c.update(id=f"clip{len(job['clips']) + 1:02d}", start=round(c["start"] + shift, 2),
                      end=round(c["end"] + shift, 2), edit_beats=shifted_beats, style=o["style"], layout=o["layout"],
                      captions=o.get("captions", True), edit_style=es, auto_edit=(es != "off"),
-                     sound_fx=o.get("sound_fx", True), status="queued", version=0)
+                     sound_fx=o.get("sound_fx", True),
+                     watermark_enabled=o.get("watermark_enabled", False),
+                     watermark_text=o.get("watermark_text", ""),
+                     watermark_position=o.get("watermark_position", branding.DEFAULT_WATERMARK_POSITION),
+                     status="queued", version=0)
             # Only the facecam layouts need a webcam, so it is looked for then, and only once: a
             # stream with no webcam is not looked for again on every clip of it.
             if o["layout"] in ("gameplay", "split") and face is False:

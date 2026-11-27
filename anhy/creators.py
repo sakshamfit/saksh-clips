@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import config, ctx
+from . import branding, config, ctx
 
 
 def _root() -> Path:
@@ -16,6 +16,7 @@ _lock = threading.RLock()
 
 DEFAULTS = {"name": "", "channel": "", "style": "bounce", "layout": "blur", "captions": True,
             "edit_style": "pro", "auto_edit": True, "sound_fx": True,
+            "watermark_enabled": False, "watermark_text": "", "watermark_position": branding.DEFAULT_WATERMARK_POSITION,
             "min_len": 15, "max_len": 60,
             "max_clips": 6, "min_score": 80, "auto_watch": False, "buffer_min": 20, "live_per_hour": 4, "ai_every_min": 3, "ai_only_on_spike": True, "auto_jump_pct": 60,
             "plan": "free", "decide_mode": "both", "must_clip_min": 0, "min_gap_min": 2,
@@ -48,6 +49,15 @@ def _fix(c: dict) -> dict:
     c["edit_style"] = es
     c["auto_edit"] = (es != "off")
     c["sound_fx"] = bool(c.get("sound_fx", True))
+    c["watermark_enabled"] = c.get("watermark_enabled") is True
+    try:
+        c["watermark_text"] = branding.clean_watermark_text(c.get("watermark_text", ""))
+    except ValueError:
+        c["watermark_text"] = ""
+    try:
+        c["watermark_position"] = branding.clean_watermark_position(c.get("watermark_position", branding.DEFAULT_WATERMARK_POSITION))
+    except ValueError:
+        c["watermark_position"] = branding.DEFAULT_WATERMARK_POSITION
     return c
 NUMERIC = {"min_len": (5, 120), "max_len": (10, 180), "max_clips": (1, 20), "min_score": (0, 100), "buffer_min": (5, 120), "live_per_hour": (1, 60), "ai_every_min": (1, 30), "auto_jump_pct": (20, 300), "must_clip_min": (0, 240), "min_gap_min": (0, 60),
            "post_min_score": (0, 100), "post_gap_min": (5, 1440), "daily_cap": (1, 50)}
@@ -62,11 +72,19 @@ def root(cid) -> Path:
 def _clean(data: dict) -> dict:
     out = {}
     for k in DEFAULTS:
-        if k in ("captions", "auto_edit", "sound_fx"):
+        if k in ("captions", "auto_edit", "sound_fx", "watermark_enabled"):
             if k in data:
                 if not isinstance(data[k], bool):
                     raise ValueError(f"{k.replace('_', ' ').title()} must be on or off.")
                 out[k] = data[k]
+            continue
+        if k == "watermark_text":
+            if k in data and data[k] is not None:
+                out[k] = branding.clean_watermark_text(data[k])
+            continue
+        if k == "watermark_position":
+            if k in data and data[k] is not None:
+                out[k] = branding.clean_watermark_position(data[k])
             continue
         if k == "edit_style":
             if k in data and data[k] is not None:
